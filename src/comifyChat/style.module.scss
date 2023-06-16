@@ -1,0 +1,259 @@
+:root {
+  --primary-color: #81daf0;
+}
+
+.chatContainer {
+  box-sizing: border-box;
+  & * {
+    // all: unset;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 10000;
+  color-scheme: normal;
+  text-align: left;
+  .chatTglBtn {
+    font-size: 2rem;
+    padding: 0.75rem;
+    border-radius: 50%;
+    color: white;
+    border: 2px solid white;
+    background: var(--primary-color);
+    cursor: pointer;
+    display: grid;
+  }
+  .chat {
+    height: 28rem;
+    background: white;
+    color: black;
+    width: 20rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(54, 54, 54, 0.363);
+    display: grid;
+    grid-template-rows: min-content 1fr min-content;
+    position: relative;
+    .clearBtn,
+    .closeBtn {
+      display: grid;
+      border-radius: 50%;
+      font-size: 1.7rem;
+      padding: 0;
+      border: none;
+      cursor: pointer;
+      color: white !important;
+      background: none;
+    }
+    .header {
+      background: var(--primary-color);
+      border-radius: 0.5rem 0.5rem 0 0;
+      padding: 0.5rem;
+      display: flex;
+    }
+    .clearBtn {
+      margin: auto;
+      margin-left: 0;
+    }
+    .closeBtn {
+      margin: auto;
+      margin-right: 0;
+    }
+    .convoForm {
+      height: 100%;
+      display: grid;
+      grid-gap: 0.5rem;
+      padding: 0.5rem;
+      grid-auto-rows: min-content;
+      overflow: auto;
+      .label {
+        font-size: 0.9rem;
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+      .input {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgb(180, 180, 180);
+      }
+      .sources {
+        display: flex;
+        grid-gap: 0 1rem;
+        flex-wrap: wrap;
+        .err {
+          flex-basis: 100%;
+        }
+      }
+      .radioLabel {
+        display: flex;
+        align-items: center;
+        grid-gap: 0.35rem;
+        cursor: pointer;
+      }
+      .err {
+        color: red;
+        font-size: 0.9rem;
+      }
+      .topics {
+        .list {
+          display: flex;
+          grid-gap: 0.5rem;
+          flex-wrap: wrap;
+          .topic {
+            border: 1px solid rgb(192, 192, 192);
+            padding: 0.3rem 0.8rem;
+            border-radius: 0.3rem;
+            cursor: pointer;
+            &.active {
+              background: var(--primary-color);
+            }
+          }
+        }
+      }
+      .textarea {
+        padding: 0.5rem;
+        font-size: 1rem;
+        min-height: 5rem;
+        display: block;
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid rgb(180, 180, 180);
+        resize: vertical;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+          "Helvetica Neue", sans-serif;
+      }
+      .btn {
+        background: var(--primary-color);
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        padding: 0.5rem;
+        cursor: pointer;
+        border-radius: 5px;
+        text-align: center;
+      }
+    }
+    .messages {
+      overflow: auto;
+      display: flex;
+      flex-direction: column-reverse;
+      grid-gap: 1px;
+      padding: 0.5rem 0.25rem;
+      .placeholder {
+        margin: auto;
+        opacity: 0.7;
+        font-style: italic;
+      }
+      .msg {
+        height: min-content;
+        padding: 0.5rem 0.8rem;
+        background: rgb(235, 234, 234);
+        max-width: 85%;
+        border-radius: 0.75rem 0.75rem 0.75rem 0;
+        &.user {
+          background: var(--primary-color);
+          margin: auto;
+          margin-right: 0;
+          border-radius: 0.75rem 0.75rem 0 0.75rem;
+        }
+        .actions {
+          display: flex;
+          justify-content: flex-end;
+          grid-gap: 0.5rem;
+          .btn {
+            padding: 0;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.2rem;
+            opacity: 0.75;
+            margin-bottom: 0.5rem;
+          }
+        }
+        .content {
+          margin: 0;
+        }
+      }
+    }
+    .chatForm {
+      /* width: 100%; */
+      display: flex;
+      border-top: 1px solid rgb(235, 234, 234);
+      background: var(--primary-color);
+      border-radius: 0 0 0.5rem 0.5rem;
+      grid-gap: 0.5rem;
+      padding: 0.5rem;
+      .input {
+        padding: 0.5rem;
+        border: none;
+        border-radius: 0.5rem;
+        width: 100%;
+        flex-basis: 100%;
+      }
+      .sendBtn {
+        font-size: 1.2rem;
+        padding: 0.35rem;
+        cursor: pointer;
+        border-radius: 0.3rem;
+        border: none;
+        display: grid;
+        background: white;
+        width: 2.2rem;
+        display: flex;
+        align-items: center;
+        grid-gap: 3px;
+        justify-content: center;
+        .dot {
+          width: 3px;
+          height: 3px;
+          background-color: black;
+          border-radius: 50%;
+          animation: waveAnimation 1.5s infinite ease-in-out;
+          &:nth-child(1) {
+            animation-delay: 0s;
+          }
+
+          &:nth-child(2) {
+            animation-delay: 0.25s;
+          }
+
+          &:nth-child(3) {
+            animation-delay: 0.5s;
+          }
+        }
+      }
+    }
+  }
+}
+
+@keyframes waveAnimation {
+  0% {
+    transform: translateY(3px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(3px);
+  }
+}
+
+@media only screen and (min-width: 480px) {
+  .convoForm::-webkit-scrollbar,
+  .messages::-webkit-scrollbar,
+  .textarea::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+    background-color: rgba(hsl(192, 100%, 85%), 0.2);
+    border-radius: 1rem;
+  }
+  .convoForm::-webkit-scrollbar-thumb,
+  .messages::-webkit-scrollbar-thumb,
+  .textarea::-webkit-scrollbar-thumb {
+    background-color: #c4c4c4;
+    border-radius: 1rem;
+  }
+}
