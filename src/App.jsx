@@ -3,9 +3,9 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 
-import { ChatContainer as ComifyChat } from "./comifyChat";
-import { ChatContextProvider } from "./comifyChat/context";
-import getEndpoints from "./comifyChat/utils/endpoints";
+import { ChatContainer as ComifyChat } from "./components/comifyChat";
+import { ChatContextProvider } from "./components/comifyChat/context";
+import getEndpoints from "./components/comifyChat/utils/endpoints";
 
 function App() {
   const [count, setCount] = useState(0);
@@ -33,7 +33,7 @@ function App() {
         Click on the Vite and React logos to learn more
       </p>
       <ChatContextProvider endpoints={getEndpoints()}>
-        <ComifyChat />
+        <ComifyChat openAtStart />
       </ChatContextProvider>
     </>
   );

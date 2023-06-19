@@ -6,22 +6,17 @@ import React, {
   useEffect,
   useContext,
 } from "react";
-import { AiOutlineMessage, AiOutlineSend } from "react-icons/ai";
-import { BiArrowBack } from "react-icons/bi";
-import { TiArrowMinimise } from "react-icons/ti";
-import { BsClipboard } from "react-icons/bs";
-import {
-  HiThumbDown,
-  HiThumbUp,
-  HiOutlineThumbDown,
-  HiOutlineThumbUp,
-} from "react-icons/hi";
 import s from "./style.module.scss";
-import { useFetch } from "./utils/useFetch";
-import getEndpoints from "./utils/endpoints";
-import { ChatContextProvider, ChatContext } from "./context";
+import { useFetch } from "./utils/useFetch.js";
+import getEndpoints from "./utils/endpoints.js";
+import { ChatContextProvider, ChatContext } from "./context.js";
+import { Toast } from "./toast.js";
+import Icon from "./icons.js";
 
-export default function ComifyChat({ baseUrl = "https://comify.in" } = {}) {
+export default function ComifyChat({
+  baseUrl = "https://comify.in",
+  openAtStart,
+} = {}) {
   const containerId = "comifyChat_container";
 
   const container = document.createElement("div");
@@ -31,32 +26,58 @@ export default function ComifyChat({ baseUrl = "https://comify.in" } = {}) {
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
       <ChatContextProvider endpoints={getEndpoints(baseUrl)}>
-        <ChatContainer />
+        <ChatContainer openAtStart={openAtStart} />
       </ChatContextProvider>
     </React.StrictMode>
   );
 }
 
-export function ChatContainer() {
-  const { setUser } = useContext(ChatContext);
-  const [open, setOpen] = useState(false);
+export function ChatContainer({ openAtStart }) {
+  const [fullScreen, setFullScreen] = useState(false);
+  const { setUser, toasts } = useContext(ChatContext);
+  const [open, setOpen] = useState(openAtStart || false);
 
   return (
     <div className={s.chatContainer}>
+      <div id="comifyChatTostContainer" className={s.toastContainer}>
+        {toasts.map((item) => (
+          <Toast
+            key={item.id}
+            id={item.id}
+            type={item.type}
+            message={item.message}
+          />
+        ))}
+      </div>
       {open ? (
-        <Chat setOpen={setOpen} setUser={setUser} />
+        <Chat
+          setOpen={setOpen}
+          setUser={setUser}
+          fullScreen={fullScreen}
+          setFullScreen={setFullScreen}
+        />
       ) : (
-        <button className={s.chatTglBtn} onClick={() => setOpen(true)}>
-          <AiOutlineMessage />
-        </button>
+        <Avatar onClick={() => setOpen(true)} />
+        // <button className={s.chatTglBtn} onClick={() => setOpen(true)}>
+        //   <Icon name="message" />
+        // </button>
       )}
     </div>
   );
 }
 
-const Chat = ({ setOpen }) => {
-  const { endpoints, convo, setConvo, messages, msgChannel, setMessages } =
-    useContext(ChatContext);
+const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
+  const chatRef = useRef();
+  const {
+    setUser,
+    endpoints,
+    convo,
+    setConvo,
+    messages,
+    msgChannel,
+    setMessages,
+    pushToast,
+  } = useContext(ChatContext);
   const messagesRef = useRef();
 
   const { post: castVote, loading } = useFetch(endpoints.message);
@@ -73,7 +94,7 @@ const Chat = ({ setOpen }) => {
       )
         .then(({ data }) => {
           if (!data.success) {
-            return alert(data.message);
+            return pushToast.error(data.message);
           }
 
           setMessages((prev) => {
@@ -84,13 +105,16 @@ const Chat = ({ setOpen }) => {
             return messages;
           });
         })
-        .catch((err) => alert(err.message));
+        .catch((err) => pushToast.error(err.message));
     },
     [convo]
   );
 
   return (
-    <div className={s.chat}>
+    <div
+      className={`${s.chat} ${fullScreen ? s.fullScreen : ""}`}
+      ref={chatRef}
+    >
       <div className={s.header}>
         {convo && (
           <button
@@ -103,21 +127,70 @@ const Chat = ({ setOpen }) => {
               localStorage.removeItem("comify_chat_id");
             }}
           >
-            <BiArrowBack />
+            <Icon name="arrow-left" />
           </button>
         )}
-        <button className={s.closeBtn} onClick={() => setOpen(false)}>
-          <TiArrowMinimise />
-        </button>
+        <div className={s.right}>
+          {window.innerWidth >= 480 && (
+            <button
+              className={s.closeBtn}
+              onClick={() => {
+                if (fullScreen) {
+                  if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                  } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                  } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                  }
+                } else {
+                  if (chatRef.current.requestFullscreen) {
+                    chatRef.current.requestFullscreen();
+                  } else if (chatRef.current.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                  } else if (chatRef.current.msRequestFullscreen) {
+                    chatRef.current.msRequestFullscreen();
+                  }
+                }
+                setFullScreen(!fullScreen);
+              }}
+            >
+              <Icon
+                className={s.fullScreen}
+                name={fullScreen ? "contract" : "expand"}
+              />
+            </button>
+          )}
+          <button
+            className={s.closeBtn}
+            onClick={() => {
+              setOpen(false);
+              if (fullScreen) {
+                if (document.exitFullscreen) {
+                  document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                  document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                  document.msExitFullscreen();
+                }
+                setFullScreen(false);
+              }
+            }}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
       </div>
 
-      <div className={s.messages} ref={messagesRef}>
-        {!convo ? (
-          <ConvoForm />
-        ) : messages.length === 0 ? (
+      {!convo ? (
+        <ConvoForm />
+      ) : messages.length === 0 ? (
+        <div className={s.messages} ref={messagesRef}>
           <p className={s.placeholder}>No message yet!</p>
-        ) : (
-          messages.map((item, i, arr) => (
+        </div>
+      ) : (
+        <div className={s.messages} ref={messagesRef}>
+          {messages.map((item, i, arr) => (
             <Message
               key={item._id}
               msg={item}
@@ -127,9 +200,10 @@ const Chat = ({ setOpen }) => {
               }}
               castVote={vote}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
       {convo && (
         <ChatForm
           scrollDown={() => {
@@ -141,25 +215,43 @@ const Chat = ({ setOpen }) => {
   );
 };
 
+const Avatar = ({ onClick }) => {
+  const { endpoints } = useContext(ChatContext);
+  return (
+    <div className={s.avatar} onClick={onClick}>
+      {/* <img
+        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/circle.webp"}
+      /> */}
+      <div className={s.circle} />
+      <img
+        className={s.hand}
+        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/hand.webp"}
+      />
+      <img
+        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/body.webp"}
+      />
+      <img
+        className={s.head}
+        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/head.webp"}
+      />
+    </div>
+  );
+};
+
 const Message = ({ msg, castVote, loading, style }) => {
   return (
     <div className={`${s.msg} ${s[msg.role]}`} style={style}>
+      <p className={s.content}>{msg.content}</p>
       {msg.role === "assistant" && (
         <div className={s.actions}>
-          <button
-            className={s.btn}
-            title="Copy"
-            onClick={() => navigator.clipboard.writeText(msg.content)}
-          >
-            <BsClipboard />
-          </button>
+          <CopyBtn content={msg.content} />
           <button
             className={s.btn}
             title="Like"
             disabled={loading}
             onClick={() => castVote(msg._id, msg.like ? null : true)}
           >
-            {msg.like ? <HiThumbUp /> : <HiOutlineThumbUp />}
+            <Icon name={msg.like ? "thumbs-up" : "thumbs-up-outlined"} />
           </button>
           <button
             className={s.btn}
@@ -167,17 +259,42 @@ const Message = ({ msg, castVote, loading, style }) => {
             disabled={loading}
             onClick={() => castVote(msg._id, msg.like === false ? null : false)}
           >
-            {msg.like === false ? <HiThumbDown /> : <HiOutlineThumbDown />}
+            <Icon
+              name={msg.like === false ? "thumbs-down" : "thumbs-down-outlined"}
+            />
           </button>
         </div>
       )}
-      <p className={s.content}>{msg.content}</p>
     </div>
   );
 };
 
+const CopyBtn = ({ content }) => {
+  const timer = useRef();
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      className={s.btn}
+      title="Copy"
+      onClick={() => {
+        navigator.clipboard.writeText(content);
+        setDone(true);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => {
+          setDone(false);
+        }, 1000);
+      }}
+    >
+      <Icon
+        className={!done ? s.clipboard : ""}
+        name={done ? "check" : "clipboard"}
+      />
+    </button>
+  );
+};
+
 const ChatForm = ({ scrollDown }) => {
-  const { endpoints, convo, setMessages, msgChannel, messages } =
+  const { endpoints, convo, setMessages, msgChannel, pushToast } =
     useContext(ChatContext);
   const [msg, setMsg] = useState("");
   const { post: sendMessage, loading } = useFetch(endpoints.chat);
@@ -189,7 +306,7 @@ const ChatForm = ({ scrollDown }) => {
       sendMessage({ content: msg }, { params: { ":chat_id": convo._id } })
         .then(({ data }) => {
           if (!data.success) {
-            return alert(data.message);
+            return pushToast.error(data.message);
           }
           setMessages((prev) => {
             const messages = [
@@ -207,7 +324,7 @@ const ChatForm = ({ scrollDown }) => {
           });
           setMsg("");
         })
-        .catch((err) => alert(err.message));
+        .catch((err) => pushToast.error(err.message));
     },
     [msg]
   );
@@ -228,7 +345,7 @@ const ChatForm = ({ scrollDown }) => {
             <span className={s.dot} />
           </>
         ) : (
-          <AiOutlineSend />
+          <Icon name="send" />
         )}
       </button>
     </form>
@@ -236,8 +353,15 @@ const ChatForm = ({ scrollDown }) => {
 };
 
 const ConvoForm = () => {
-  const { user, setMessages, msgChannel, endpoints, setConvo, topics } =
-    useContext(ChatContext);
+  const {
+    user,
+    setMessages,
+    msgChannel,
+    endpoints,
+    setConvo,
+    topics,
+    pushToast,
+  } = useContext(ChatContext);
   const [errors, setErrors] = useState({});
   const [source, setSource] = useState("");
   const [topic, setTopic] = useState("");
@@ -288,14 +412,14 @@ const ConvoForm = () => {
       )
         .then(({ data }) => {
           if (!data.success) {
-            return alert(data.message);
+            return pushToast.error(data.message);
           }
           localStorage.setItem("comify_chat_id", data.data._id);
           setConvo({ ...data.data, messages: undefined });
           msgChannel.postMessage({ messages: data.data.messages.reverse() });
-          setMessages(data.data.messages.reverse());
+          setMessages(data.data.messages);
         })
-        .catch((err) => alert(err.message));
+        .catch((err) => pushToast.error(err.message));
     },
     [topic, name, source, email, url, msg]
   );
@@ -406,7 +530,15 @@ const ConvoForm = () => {
         />
       </section>
       <button className={s.btn} disabled={loading}>
-        Submit
+        {loading ? (
+          <>
+            <span className={s.dot} />
+            <span className={s.dot} />
+            <span className={s.dot} />
+          </>
+        ) : (
+          "Submit"
+        )}
       </button>
     </form>
   );

@@ -6,7 +6,7 @@
   "author": "Naeem Ahmad <naeem.ahmad.9m@gmail.com>",
   "scripts": {
     "dev": "vite --port 4005",
-    "build": "npx webpack",
+    "build": "npx webpack --mode production",
     "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
