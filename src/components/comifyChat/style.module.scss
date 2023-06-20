@@ -54,9 +54,11 @@
       background: #e6e2fd;
       position: absolute;
       border-radius: 50%;
+      box-shadow: 0 9px 58px 0 rgba(#8e7aff, 0.8);
     }
   }
   .chat {
+    box-shadow: 0 10px 58px 0 rgba(#8e7aff, 0.5);
     height: 28rem;
     background: white;
     color: black;
