@@ -9,6 +9,96 @@ import useFetch from "./utils/useFetch.js";
 
 export const ChatContext = createContext();
 
+export const generateMessages = ({
+  topics,
+  topic,
+  url,
+  askUrl,
+  name,
+  askName,
+  email,
+  askEmail,
+  askQuery,
+}) => {
+  const messages = [
+    {
+      _id: "greetings",
+      role: "system",
+      content:
+        "Hello, how may I help you today? Please pick a topic from below with which I can assist you:",
+    },
+  ];
+  if (topics) {
+    messages.unshift({
+      _id: "topicQuery",
+      type: "suggestion",
+      options: topics,
+    });
+  }
+  if (topic) {
+    messages.unshift({
+      _id: "topicResponse",
+      role: "user",
+      content: topic,
+    });
+  }
+  if (askName || name) {
+    messages.unshift({
+      _id: "nameQuery",
+      role: "system",
+      content: "Please enter your name",
+    });
+  }
+  if (name) {
+    messages.unshift({
+      _id: "nameResponse",
+      role: "user",
+      content: name,
+    });
+  }
+  if (askEmail || email) {
+    messages.unshift({
+      _id: "emailQuery",
+      role: "system",
+      content: "Please enter your email",
+    });
+  }
+  if (email) {
+    messages.unshift({
+      _id: "emailResponse",
+      role: "user",
+      content: email,
+    });
+  }
+  if (askUrl || url) {
+    messages.unshift({
+      _id: "urlQuery",
+      role: "system",
+      content: "Please enter a URL",
+    });
+  }
+  if (url) {
+    messages.unshift({
+      _id: "urlResponse",
+      role: "user",
+      content: url,
+    });
+  }
+  if (askQuery) {
+    messages.unshift({
+      _id: "queryQuery",
+      role: "system",
+      content: "Please ask your question",
+    });
+  }
+  return messages;
+};
+
+function resizeWindow() {
+  let vh = window.innerHeight * 0.01;
+  document.body.style.setProperty("--vh", `${vh}px`);
+}
+
 export const ChatContextProvider = ({ children, endpoints }) => {
   const msgChannel = useRef();
   const [toasts, setToasts] = useState([]);
@@ -16,6 +106,9 @@ export const ChatContextProvider = ({ children, endpoints }) => {
   const [convo, setConvo] = useState(null);
   const [topics, setTopics] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [initMessages, setInitMessages] = useState(
+    generateMessages({ topics: [] })
+  );
 
   const { get: getTopics } = useFetch(endpoints.topics);
   const { get: getChat } = useFetch(endpoints.chat);
@@ -42,10 +135,18 @@ export const ChatContextProvider = ({ children, endpoints }) => {
   };
 
   useEffect(() => {
+    window.addEventListener("resize", () => resizeWindow());
+    resizeWindow();
+
     getTopics()
       .then(({ data }) => {
         if (data.success) {
           setTopics(data.data);
+          setInitMessages((prev) =>
+            prev.map((item) =>
+              item._id === "topicQuery" ? { ...item, options: data.data } : item
+            )
+          );
         } else {
           // alert(data.message);
         }
@@ -62,6 +163,16 @@ export const ChatContextProvider = ({ children, endpoints }) => {
           if (data.success) {
             setConvo({ ...data.data, messages: undefined });
             setMessages(data.data.messages.reverse());
+            setInitMessages(
+              generateMessages({
+                topics,
+                topic: data.data.topic,
+                url: data.data.url,
+                name: data.data.user.name,
+                email: data.data.user.email,
+                askQuery: true,
+              })
+            );
           }
         })
         .catch((err) => console.log(err));
@@ -94,6 +205,8 @@ export const ChatContextProvider = ({ children, endpoints }) => {
         setToasts,
         pushToast,
         msgChannel: msgChannel.current,
+        initMessages,
+        setInitMessages,
       }}
     >
       {children}

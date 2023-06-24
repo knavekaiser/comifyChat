@@ -9,7 +9,11 @@ import React, {
 import s from "./style.module.scss";
 import { useFetch } from "./utils/useFetch.js";
 import getEndpoints from "./utils/endpoints.js";
-import { ChatContextProvider, ChatContext } from "./context.js";
+import {
+  ChatContextProvider,
+  ChatContext,
+  generateMessages,
+} from "./context.js";
 import { Toast } from "./toast.js";
 import Icon from "./icons.js";
 
@@ -66,6 +70,8 @@ export function ChatContainer({ openAtStart }) {
   );
 }
 
+const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
+
 const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   const chatRef = useRef();
   const {
@@ -77,7 +83,11 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
     msgChannel,
     setMessages,
     pushToast,
+    initMessages,
+    setInitMessages,
+    topics,
   } = useContext(ChatContext);
+
   const messagesRef = useRef();
 
   const { post: castVote, loading } = useFetch(endpoints.message);
@@ -110,27 +120,71 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
     [convo]
   );
 
+  const { post: initChat_post, loading: initiatingChat } = useFetch(
+    endpoints.chat
+  );
+  const initChat = useCallback(
+    (msg) => {
+      initChat_post(
+        {
+          ...(convo?.topic && convo.topic !== "URL" && { topic: convo.topic }),
+          ...(convo?.url && {
+            url: convo.url,
+          }),
+          name: convo.name,
+          email: convo.email,
+          message: msg,
+        },
+        { params: { ":chat_id": "" } }
+      )
+        .then(({ data }) => {
+          if (!data.success) {
+            return pushToast.error(data.message);
+          }
+          localStorage.setItem("comify_chat_id", data.data._id);
+          setConvo({ ...data.data, messages: undefined });
+          msgChannel.postMessage({ messages: data.data.messages.reverse() });
+          setMessages(data.data.messages);
+        })
+        .catch((err) => pushToast.error(err.message));
+    },
+    [convo]
+  );
+
   return (
     <div
       className={`${s.chat} ${fullScreen ? s.fullScreen : ""}`}
       ref={chatRef}
     >
       <div className={s.header}>
-        {convo && (
+        {convo?.topic && (
           <button
             className={s.clearBtn}
             onClick={() => {
               setUser(convo.user);
               setConvo(null);
               msgChannel.postMessage({ messages: [] });
+              setInitMessages(generateMessages({ topics }));
               setMessages([]);
               localStorage.removeItem("comify_chat_id");
             }}
           >
-            <Icon name="arrow-left" />
+            <Icon name="clear" />
+
+            <span title={convo.topic} className={s.title}>
+              {convo.url ? "URL" : convo.topic}
+            </span>
           </button>
         )}
         <div className={s.right}>
+          <button
+            className={s.home}
+            onClick={() => {
+              messagesRef.current.scrollTop = -messagesRef.current.scrollHeight;
+            }}
+          >
+            <Icon name="home" />
+          </button>
           {window.innerWidth >= 480 && (
             <button
               className={s.closeBtn}
@@ -182,32 +236,175 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
         </div>
       </div>
 
-      {!convo ? (
-        <ConvoForm />
-      ) : messages.length === 0 ? (
-        <div className={s.messages} ref={messagesRef}>
-          <p className={s.placeholder}>No message yet!</p>
-        </div>
-      ) : (
-        <div className={s.messages} ref={messagesRef}>
-          {messages.map((item, i, arr) => (
-            <Message
-              key={item._id}
-              msg={item}
-              loading={loading}
-              style={{
-                marginBottom: arr[i - 1]?.role !== item.role ? 5 : 0,
-              }}
-              castVote={vote}
-            />
-          ))}
-        </div>
-      )}
+      <div className={s.messages} ref={messagesRef}>
+        {(convo?._id ? [...messages, ...initMessages] : initMessages).map(
+          (item, i, arr) =>
+            item.type === "suggestion" ? (
+              <Suggestions
+                key={item._id}
+                options={[...item.options, "URL"]}
+                active={convo?.url ? "URL" : convo?.topic}
+                onChange={async (input) => {
+                  await wait(200);
+                  const name = convo?.user?.name || convo?.name;
+                  const email = convo?.user?.email || convo?.email;
+                  setConvo({
+                    topic: input,
+                    name,
+                    email,
+                  });
 
-      {convo && (
+                  setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
+
+                  if (!convo?._id) {
+                    if (input === "URL") {
+                      setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: input,
+                          ...(name ? { name } : { askName: true }),
+                          ...(email ? { email } : { askEmail: true }),
+                          ...(name && email ? { askUrl: true } : {}),
+                        })
+                      );
+                      return;
+                    }
+                    setInitMessages(
+                      generateMessages({
+                        topics,
+                        topic: input,
+                        ...(name ? { name } : { askName: true }),
+                        ...(email ? { email } : { askEmail: true }),
+                        ...(name && email ? { askQuery: true } : {}),
+                      })
+                    );
+                  } else {
+                    if (input === "URL") {
+                      setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: input,
+                          name: convo.user.name || convo.name,
+                          email: convo.user.email || convo.email,
+                          askUrl: true,
+                        })
+                      );
+                    } else {
+                      setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: input,
+                          input,
+                          name: convo.user.name || convo.name,
+                          email: convo.user.email || convo.email,
+                          askQuery: true,
+                        })
+                      );
+                    }
+
+                    setMessages([]);
+                    localStorage.removeItem("comify_chat_id");
+                    messagesRef.current.scrollTop = 0;
+                  }
+                }}
+              />
+            ) : (
+              <Message
+                key={item._id}
+                msg={item}
+                loading={loading}
+                style={{
+                  marginBottom: arr[i - 1]?.role !== item.role ? 5 : 0,
+                }}
+                castVote={vote}
+              />
+            )
+        )}
+      </div>
+
+      {!convo?._id &&
+        (!convo?.name ||
+          !convo?.email ||
+          (convo?.topic === "URL" && !convo.url)) && (
+          <ChatForm
+            inputOptions={{
+              type:
+                convo?.topic === "URL" && !convo?.url
+                  ? "text"
+                  : convo?.name
+                  ? "email"
+                  : "",
+              readOnly: !(convo?.topic || convo?.url),
+            }}
+            onSubmit={async (values, options) => {
+              await wait(200);
+              if (convo?.topic === "URL" && !convo.url) {
+                const name = convo?.name;
+                const email = convo?.email;
+                setInitMessages(
+                  generateMessages({
+                    topics,
+                    topic: convo.topic,
+                    url: values.msg.startsWith("http")
+                      ? values.msg
+                      : "http://" + values.msg,
+                    ...(name ? { name } : { askName: true }),
+                    ...(email ? { email } : { askEmail: true }),
+                    ...(name && email ? { askQuery: true } : {}),
+                  })
+                );
+                setConvo((prev) => ({ ...prev, url: values.msg }));
+                options.clearForm();
+              } else if (!convo.name) {
+                setInitMessages(
+                  generateMessages({
+                    topics,
+                    topic: convo.topic,
+                    name: values.msg,
+                    askEmail: true,
+                  })
+                );
+                setConvo((prev) => ({ ...prev, name: values.msg }));
+              } else if (!convo.email) {
+                setInitMessages(
+                  generateMessages({
+                    topics,
+                    topic: convo.topic,
+                    name: convo.user,
+                    email: values.msg,
+                    askQuery: true,
+                  })
+                );
+                setConvo((prev) => ({ ...prev, email: values.msg }));
+              }
+              options.clearForm();
+              setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
+            }}
+            scrollDown={() => {
+              messagesRef.current.scrollTop = 0;
+            }}
+          />
+        )}
+
+      {!convo?._id &&
+        (convo?.topic === "URL" ? convo.url : convo?.topic) &&
+        convo?.name &&
+        convo?.email && (
+          <ChatForm
+            onSubmit={(values, options) => {
+              initChat(values.msg);
+            }}
+            scrollDown={() => {
+              messagesRef.current.scrollTop = 0;
+            }}
+            loading={initiatingChat}
+          />
+        )}
+
+      {convo?._id && (
         <ChatForm
           scrollDown={() => {
-            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+            messagesRef.current.scrollTop = 0;
           }}
         />
       )}
@@ -269,6 +466,23 @@ const Message = ({ msg, castVote, loading, style }) => {
   );
 };
 
+const Suggestions = ({ options, active, onChange }) => {
+  return (
+    <div className={s.suggestions} style={{ marginBottom: ".3rem" }}>
+      {options.map((item) => (
+        <button
+          disabled={item === active}
+          className={`${s.chip} ${item === active ? s.active : ""}`}
+          key={item}
+          onClick={() => onChange(item)}
+        >
+          {item}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 const CopyBtn = ({ content }) => {
   const timer = useRef();
   const [done, setDone] = useState(false);
@@ -293,7 +507,12 @@ const CopyBtn = ({ content }) => {
   );
 };
 
-const ChatForm = ({ scrollDown }) => {
+const ChatForm = ({
+  inputOptions,
+  scrollDown,
+  onSubmit,
+  loading: defaultLoading,
+}) => {
   const { endpoints, convo, setMessages, msgChannel, pushToast } =
     useContext(ChatContext);
   const [msg, setMsg] = useState("");
@@ -323,22 +542,45 @@ const ChatForm = ({ scrollDown }) => {
             return messages;
           });
           setMsg("");
+          setTimeout(() => scrollDown(), 50);
         })
         .catch((err) => pushToast.error(err.message));
     },
     [msg]
   );
   return (
-    <form className={s.chatForm} onSubmit={submit}>
+    <form
+      className={s.chatForm}
+      onSubmit={
+        onSubmit
+          ? (e) => {
+              e.preventDefault();
+              onSubmit(
+                { msg },
+                {
+                  clearForm: () => {
+                    setMsg("");
+                  },
+                }
+              );
+            }
+          : submit
+      }
+    >
       <input
+        autoFocus
+        readOnly={loading || defaultLoading}
+        {...inputOptions}
         placeholder="Type a message"
         value={msg}
-        readOnly={loading}
         onChange={(e) => setMsg(e.target.value)}
         className={s.input}
       />
-      <button className={s.sendBtn} disabled={loading || !msg.trim()}>
-        {loading ? (
+      <button
+        className={s.sendBtn}
+        disabled={loading || defaultLoading || !msg.trim()}
+      >
+        {defaultLoading || loading ? (
           <>
             <span className={s.dot} />
             <span className={s.dot} />
@@ -346,198 +588,6 @@ const ChatForm = ({ scrollDown }) => {
           </>
         ) : (
           <Icon name="send" />
-        )}
-      </button>
-    </form>
-  );
-};
-
-const ConvoForm = () => {
-  const {
-    user,
-    setMessages,
-    msgChannel,
-    endpoints,
-    setConvo,
-    topics,
-    pushToast,
-  } = useContext(ChatContext);
-  const [errors, setErrors] = useState({});
-  const [source, setSource] = useState("");
-  const [topic, setTopic] = useState("");
-  const [url, setUrl] = useState("");
-  const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
-  const [msg, setMsg] = useState("");
-
-  const { post: initChat, loading } = useFetch(endpoints.chat);
-
-  const submit = useCallback(
-    (e) => {
-      e.preventDefault();
-
-      if (!source) {
-        return setErrors((prev) => ({
-          ...prev,
-          source: "Please select a source",
-        }));
-      }
-
-      if (source === "topic" && !topic) {
-        return setErrors((prev) => ({
-          ...prev,
-          topic: "Please select a topic",
-        }));
-      }
-      if (source === "url" && !url) {
-        return setErrors((prev) => ({
-          ...prev,
-          url: "Please provide an URL",
-        }));
-      }
-
-      initChat(
-        {
-          ...(topic && { topic }),
-          ...(url && { url: url.startsWith("http") ? url : "http://" + url }),
-          name,
-          email,
-          message: msg,
-        },
-        {
-          params: {
-            ":chat_id": "",
-          },
-        }
-      )
-        .then(({ data }) => {
-          if (!data.success) {
-            return pushToast.error(data.message);
-          }
-          localStorage.setItem("comify_chat_id", data.data._id);
-          setConvo({ ...data.data, messages: undefined });
-          msgChannel.postMessage({ messages: data.data.messages.reverse() });
-          setMessages(data.data.messages);
-        })
-        .catch((err) => pushToast.error(err.message));
-    },
-    [topic, name, source, email, url, msg]
-  );
-
-  return (
-    <form className={s.convoForm} onSubmit={submit}>
-      <section>
-        <label className={s.label}>Name</label>
-        <input
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={s.input}
-        />
-      </section>
-      <section>
-        <label className={s.label}>Email</label>
-        <input
-          required
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={s.input}
-        />
-      </section>
-
-      <section className={s.sources}>
-        <label htmlFor="topic" className={s.label}>
-          Source:
-        </label>
-        {
-          <div className={s.radio}>
-            <label htmlFor="topic" className={s.radioLabel}>
-              <input
-                id="topic"
-                type="radio"
-                value="topic"
-                checked={source === "topic"}
-                disabled={topics.length === 0}
-                onChange={(e) => {
-                  setSource(e.target.value);
-                  setErrors((prev) => ({ ...prev, source: undefined }));
-                }}
-              />
-              Topic
-            </label>
-          </div>
-        }
-        <div className={s.radio}>
-          <label htmlFor="url" className={s.radioLabel}>
-            <input
-              id="url"
-              type="radio"
-              value="url"
-              checked={source === "url"}
-              onChange={(e) => {
-                setSource(e.target.value);
-                setErrors((prev) => ({ ...prev, source: undefined }));
-              }}
-            />
-            URL
-          </label>
-        </div>
-        {errors.source && <p className={s.err}>{errors.source}</p>}
-      </section>
-
-      {source === "topic" && (
-        <section className={s.topics}>
-          <label className={s.label}>Pick a Topic</label>
-          <ul className={s.list}>
-            {topics.map((item) => (
-              <li
-                key={item}
-                className={`${s.topic} ${topic === item ? s.active : ""}`}
-                onClick={() => {
-                  setTopic(item);
-                  setErrors((prev) => ({ ...prev, topic: undefined }));
-                }}
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-          {errors.topic && <p className={s.err}>{errors.topic}</p>}
-        </section>
-      )}
-
-      {source === "url" && (
-        <section>
-          <label className={s.label}>URL</label>
-          <input
-            required
-            // type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className={s.input}
-          />
-        </section>
-      )}
-
-      <section>
-        <label className={s.label}>Message</label>
-        <textarea
-          required
-          value={msg}
-          onChange={(e) => setMsg(e.target.value)}
-          className={s.textarea}
-        />
-      </section>
-      <button className={s.btn} disabled={loading}>
-        {loading ? (
-          <>
-            <span className={s.dot} />
-            <span className={s.dot} />
-            <span className={s.dot} />
-          </>
-        ) : (
-          "Submit"
         )}
       </button>
     </form>

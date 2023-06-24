@@ -33,7 +33,7 @@ function App() {
         Click on the Vite and React logos to learn more
       </p>
       <ChatContextProvider endpoints={getEndpoints()}>
-        <ComifyChat openAtStart />
+        <ComifyChat false />
       </ChatContextProvider>
     </>
   );
