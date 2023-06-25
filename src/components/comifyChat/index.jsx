@@ -87,6 +87,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
     setInitMessages,
     topics,
   } = useContext(ChatContext);
+  const [currInput, setCurrInput] = useState("");
 
   const messagesRef = useRef();
 
@@ -158,23 +159,24 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
     >
       <div className={s.header}>
         {convo?.topic && (
-          <button
-            className={s.clearBtn}
-            onClick={() => {
-              setUser(convo.user);
-              setConvo(null);
-              msgChannel.postMessage({ messages: [] });
-              setInitMessages(generateMessages({ topics }));
-              setMessages([]);
-              localStorage.removeItem("comify_chat_id");
-            }}
-          >
-            <Icon name="clear" />
-
+          <div className={s.left}>
+            <button
+              className={s.clearBtn}
+              onClick={() => {
+                setUser(convo.user);
+                setConvo(null);
+                msgChannel.postMessage({ messages: [] });
+                setInitMessages(generateMessages({ topics }));
+                setMessages([]);
+                localStorage.removeItem("comify_chat_id");
+              }}
+            >
+              <Icon name="clear" />
+            </button>
             <span title={convo.topic} className={s.title}>
               {convo.url ? "URL" : convo.topic}
             </span>
-          </button>
+          </div>
         )}
         <div className={s.right}>
           <button
@@ -246,6 +248,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                 active={convo?.url ? "URL" : convo?.topic}
                 onChange={async (input) => {
                   await wait(200);
+
                   const name = convo?.user?.name || convo?.name;
                   const email = convo?.user?.email || convo?.email;
                   setConvo({
@@ -263,10 +266,17 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                           topics,
                           topic: input,
                           ...(name ? { name } : { askName: true }),
-                          ...(email ? { email } : { askEmail: true }),
+                          ...(email ? { email } : { askEmail: !!name }),
                           ...(name && email ? { askUrl: true } : {}),
                         })
                       );
+                      if (!name) {
+                        setCurrInput("name");
+                      } else if (!email) {
+                        setCurrInput("email");
+                      } else if (name && email) {
+                        setCurrInput("url");
+                      }
                       return;
                     }
                     setInitMessages(
@@ -274,32 +284,43 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                         topics,
                         topic: input,
                         ...(name ? { name } : { askName: true }),
-                        ...(email ? { email } : { askEmail: true }),
+                        ...(email ? { email } : { askEmail: !!name }),
                         ...(name && email ? { askQuery: true } : {}),
                       })
                     );
+                    if (!name) {
+                      setCurrInput("name");
+                    } else if (!email) {
+                      setCurrInput("email");
+                    } else if (name && email) {
+                      setCurrInput("query");
+                    }
                   } else {
                     if (input === "URL") {
                       setInitMessages(
                         generateMessages({
                           topics,
                           topic: input,
-                          name: convo.user.name || convo.name,
-                          email: convo.user.email || convo.email,
+                          name,
+                          email,
                           askUrl: true,
                         })
                       );
+                      if (name && email) {
+                        setCurrInput("url");
+                      }
                     } else {
                       setInitMessages(
                         generateMessages({
                           topics,
                           topic: input,
                           input,
-                          name: convo.user.name || convo.name,
-                          email: convo.user.email || convo.email,
+                          name,
+                          email,
                           askQuery: true,
                         })
                       );
+                      setCurrInput("query");
                     }
 
                     setMessages([]);
@@ -322,84 +343,91 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
         )}
       </div>
 
-      {!convo?._id &&
-        (!convo?.name ||
-          !convo?.email ||
-          (convo?.topic === "URL" && !convo.url)) && (
-          <ChatForm
-            inputOptions={{
-              type:
-                convo?.topic === "URL" && !convo?.url
-                  ? "text"
-                  : convo?.name
-                  ? "email"
-                  : "",
-              readOnly: !(convo?.topic || convo?.url),
-            }}
-            onSubmit={async (values, options) => {
-              await wait(200);
-              if (convo?.topic === "URL" && !convo.url) {
-                const name = convo?.name;
-                const email = convo?.email;
-                setInitMessages(
-                  generateMessages({
-                    topics,
-                    topic: convo.topic,
-                    url: values.msg.startsWith("http")
-                      ? values.msg
-                      : "http://" + values.msg,
-                    ...(name ? { name } : { askName: true }),
-                    ...(email ? { email } : { askEmail: true }),
-                    ...(name && email ? { askQuery: true } : {}),
-                  })
-                );
-                setConvo((prev) => ({ ...prev, url: values.msg }));
-                options.clearForm();
-              } else if (!convo.name) {
-                setInitMessages(
-                  generateMessages({
-                    topics,
-                    topic: convo.topic,
-                    name: values.msg,
-                    askEmail: true,
-                  })
-                );
-                setConvo((prev) => ({ ...prev, name: values.msg }));
-              } else if (!convo.email) {
-                setInitMessages(
-                  generateMessages({
-                    topics,
-                    topic: convo.topic,
-                    name: convo.user,
-                    email: values.msg,
-                    askQuery: true,
-                  })
-                );
-                setConvo((prev) => ({ ...prev, email: values.msg }));
-              }
+      {!convo?._id && ["", "name", "email", "url"].includes(currInput) && (
+        <ChatForm
+          inputOptions={{
+            type: currInput === "email" ? "email" : "text",
+            readOnly: !(convo?.topic || convo?.url),
+          }}
+          onSubmit={async (values, options) => {
+            await wait(200);
+            if (currInput === "url") {
+              const name = convo?.name;
+              const email = convo?.email;
+              setInitMessages(
+                generateMessages({
+                  topics,
+                  topic: convo.topic,
+                  url: values.msg.startsWith("http")
+                    ? values.msg
+                    : "http://" + values.msg,
+                  ...(name ? { name } : { askName: true }),
+                  ...(email ? { email } : { askEmail: !!name }),
+                  ...(name && email ? { askQuery: true } : {}),
+                })
+              );
+              setConvo((prev) => ({
+                ...prev,
+                url: values.msg.startsWith("http")
+                  ? values.msg
+                  : "http://" + values.msg,
+              }));
               options.clearForm();
-              setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
-            }}
-            scrollDown={() => {
-              messagesRef.current.scrollTop = 0;
-            }}
-          />
-        )}
+              if (convo?.name && convo.email) {
+                setCurrInput("query");
+              }
+            } else if (currInput === "name") {
+              setInitMessages(
+                generateMessages({
+                  topics,
+                  topic: convo.topic,
+                  name: values.msg,
+                  askEmail: true,
+                })
+              );
+              setConvo((prev) => ({ ...prev, name: values.msg }));
+              if (!convo?.email) {
+                setCurrInput("email");
+              }
+            } else if (currInput === "email") {
+              setInitMessages(
+                generateMessages({
+                  topics,
+                  topic: convo.topic,
+                  name: convo.name,
+                  email: values.msg,
+                  ...(convo.topic === "URL"
+                    ? { askUrl: true }
+                    : { askQuery: true }),
+                })
+              );
+              setConvo((prev) => ({ ...prev, email: values.msg }));
+              if (convo?.topic === "URL") {
+                setCurrInput("url");
+              } else {
+                setCurrInput("query");
+              }
+            }
+            options.clearForm();
+            setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
+          }}
+          scrollDown={() => {
+            messagesRef.current.scrollTop = 0;
+          }}
+        />
+      )}
 
-      {!convo?._id &&
-        (convo?.topic === "URL" ? convo.url : convo?.topic) &&
-        convo?.name &&
-        convo?.email && (
-          <ChatForm
-            onSubmit={(values, options) => {
-              initChat(values.msg);
-            }}
-            scrollDown={() => {
-              messagesRef.current.scrollTop = 0;
-            }}
-            loading={initiatingChat}
-          />
-        )}
+      {!convo?._id && currInput === "query" && (
+        <ChatForm
+          onSubmit={(values, options) => {
+            initChat(values.msg);
+          }}
+          scrollDown={() => {
+            messagesRef.current.scrollTop = 0;
+          }}
+          loading={initiatingChat}
+        />
+      )}
 
       {convo?._id && (
         <ChatForm

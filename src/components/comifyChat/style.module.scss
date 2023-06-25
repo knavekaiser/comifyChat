@@ -70,13 +70,6 @@
     .clearBtn {
       grid-template-columns: max-content max-content;
       grid-gap: 0.5rem;
-      .title {
-        font-size: 1.2rem;
-        max-width: 12rem;
-        text-overflow: ellipsis;
-        overflow: hidden;
-        white-space: nowrap;
-      }
     }
     .header {
       background: var(--primary-color);
@@ -95,6 +88,17 @@
         cursor: pointer;
         color: white;
         background: none;
+      }
+      .left {
+        display: flex;
+        align-items: center;
+        .title {
+          color: white;
+          max-width: 10rem;
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+        }
       }
       .right {
         .home {
@@ -305,7 +309,7 @@
   }
   .toastContainer {
     z-index: 10;
-    width: 20rem;
+    width: min-content;
     height: 100%;
     overflow: auto;
     overflow-x: hidden;
@@ -313,6 +317,7 @@
     grid-gap: 0.5rem;
     border-radius: 0.5rem;
     .toast {
+      width: 20rem;
       padding: 0.5rem;
       border-radius: 0.5rem;
       display: grid;
@@ -428,11 +433,8 @@ button {
 
 @media only screen and (max-width: 480px) {
   .chatContainer {
-    height: 100%;
-    width: 100%;
     right: 0;
     bottom: 0;
-    top: 0;
     grid-template-rows: 1fr;
     justify-content: unset;
     border-radius: 0;
@@ -448,6 +450,13 @@ button {
       grid-column: 1 / 2;
       width: 100%;
       height: calc((var(--vh) * 100));
+      border-radius: 0;
+      .header {
+        border-radius: 0;
+      }
+      .chatForm {
+        border-radius: 0;
+      }
     }
     .toastContainer {
       height: min-content;

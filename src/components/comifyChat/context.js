@@ -124,10 +124,10 @@ export const ChatContextProvider = ({ children, endpoints }) => {
       ...prev,
     ]);
 
-    window[`comify_toast_timeout_${id}`] = setTimeout(() => {
-      setToasts((prev) => prev.filter((item) => item.id !== id));
-      delete window[`comify_toast_timeout_${id}`];
-    }, 3000);
+    // window[`comify_toast_timeout_${id}`] = setTimeout(() => {
+    //   setToasts((prev) => prev.filter((item) => item.id !== id));
+    //   delete window[`comify_toast_timeout_${id}`];
+    // }, 3000);
   }, []);
   const pushToast = {
     success: (message) => _pushToast("success", message),
