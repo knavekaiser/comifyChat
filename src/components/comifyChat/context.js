@@ -10,6 +10,7 @@ import useFetch from "./utils/useFetch.js";
 export const ChatContext = createContext();
 
 export const generateMessages = ({
+  chatStartedAt = new Date(),
   topics,
   topic,
   url,
@@ -26,6 +27,7 @@ export const generateMessages = ({
       role: "system",
       content:
         "Hello, how may I help you today? Please pick a topic from below with which I can assist you:",
+      createdAt: chatStartedAt,
     },
   ];
   if (topics) {
@@ -33,6 +35,7 @@ export const generateMessages = ({
       _id: "topicQuery",
       type: "suggestion",
       options: topics,
+      createdAt: chatStartedAt,
     });
   }
   if (topic) {
@@ -40,6 +43,7 @@ export const generateMessages = ({
       _id: "topicResponse",
       role: "user",
       content: topic,
+      createdAt: chatStartedAt,
     });
   }
   if (askName || name) {
@@ -47,6 +51,7 @@ export const generateMessages = ({
       _id: "nameQuery",
       role: "system",
       content: "Please enter your name",
+      createdAt: chatStartedAt,
     });
   }
   if (name) {
@@ -54,6 +59,7 @@ export const generateMessages = ({
       _id: "nameResponse",
       role: "user",
       content: name,
+      createdAt: chatStartedAt,
     });
   }
   if (askEmail || email) {
@@ -61,6 +67,7 @@ export const generateMessages = ({
       _id: "emailQuery",
       role: "system",
       content: "Please enter your email",
+      createdAt: chatStartedAt,
     });
   }
   if (email) {
@@ -68,6 +75,7 @@ export const generateMessages = ({
       _id: "emailResponse",
       role: "user",
       content: email,
+      createdAt: chatStartedAt,
     });
   }
   if (askUrl || url) {
@@ -75,6 +83,7 @@ export const generateMessages = ({
       _id: "urlQuery",
       role: "system",
       content: "Please enter a URL",
+      createdAt: chatStartedAt,
     });
   }
   if (url) {
@@ -82,6 +91,7 @@ export const generateMessages = ({
       _id: "urlResponse",
       role: "user",
       content: url,
+      createdAt: chatStartedAt,
     });
   }
   if (askQuery) {
@@ -89,6 +99,7 @@ export const generateMessages = ({
       _id: "queryQuery",
       role: "system",
       content: "Please ask your question",
+      createdAt: chatStartedAt,
     });
   }
   return messages;
@@ -166,6 +177,7 @@ export const ChatContextProvider = ({ children, endpoints }) => {
             setMessages(data.data.messages.reverse());
             setInitMessages(
               generateMessages({
+                chatStartedAt: new Date(data.data.createdAt),
                 topics,
                 topic: data.data.topic,
                 url: data.data.url,

@@ -1,5 +1,5 @@
 :root {
-  --primary-color: #5e4ad8;
+  --primary-color: #0084ff;
   --green: rgb(34, 189, 99);
   --red: rgb(189, 34, 60);
 }
@@ -25,6 +25,9 @@
   align-items: center;
   max-height: calc(100vh - 2rem);
   grid-gap: 0.5rem;
+  input {
+    outline-color: var(--primary-color);
+  }
   .avatar {
     margin: auto;
     margin-right: 0;
@@ -58,12 +61,12 @@
   }
   .chat {
     box-shadow: 0 10px 58px 0 rgba(#8e7aff, 0.5);
-    height: 28rem;
-    background: white;
+    height: 30rem;
+    background: #f0f0f0;
     color: black;
     width: 20rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(54, 54, 54, 0.363);
+    // border: 1px solid rgba(54, 54, 54, 0.363);
     display: grid;
     grid-template-rows: min-content 1fr min-content;
     position: relative;
@@ -72,11 +75,13 @@
       grid-gap: 0.5rem;
     }
     .header {
-      background: var(--primary-color);
+      background: white;
       border-radius: 0.5rem 0.5rem 0 0;
       padding: 0.5rem;
       display: flex;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+      font-size: 0.9rem;
+      color: rgb(53, 53, 53);
       button {
         align-items: center;
         outline: none;
@@ -86,14 +91,15 @@
         padding: 0;
         border: none;
         cursor: pointer;
-        color: white;
+        color: rgb(53, 53, 53);
+        // color: white;
         background: none;
       }
       .left {
         display: flex;
         align-items: center;
         .title {
-          color: white;
+          // color: white;
           max-width: 10rem;
           text-overflow: ellipsis;
           overflow: hidden;
@@ -208,7 +214,7 @@
       flex-direction: column-reverse;
       grid-gap: 1px;
       // padding: 0 0.25rem;
-      padding: 0.5rem 0.25rem;
+      padding: 0.75rem;
       .placeholder {
         margin: auto;
         opacity: 0.7;
@@ -216,31 +222,94 @@
       }
       .msg {
         height: min-content;
-        padding: 0.5rem 0.8rem;
-        background: rgb(235, 234, 234);
-        max-width: 85%;
-        border-radius: 0.75rem 0.75rem 0.75rem 0;
-        position: relative;
         margin-right: auto;
-        // &.assistant {
-        //   min-height: 10rem;
-        // }
+        display: grid;
+        grid-template-columns: 2.5rem 1fr;
+        grid-gap: 12px;
+        align-items: flex-start;
+        .content {
+          border-radius: 0.5rem;
+          position: relative;
+          background: white;
+          position: relative;
+          padding: 0.5rem 0.8rem;
+          &::before {
+            content: "";
+            display: block;
+            position: absolute;
+            left: -7px;
+            height: 0;
+            width: 0;
+          }
+        }
+        &:not(.user) {
+          .content {
+            &::before {
+              border-top: 7px solid transparent;
+              border-bottom: 7px solid transparent;
+              border-right: 10px solid white;
+            }
+          }
+        }
         &.user {
-          background: var(--primary-color);
           margin-left: auto;
           margin-right: 0;
-          border-radius: 0.75rem 0.75rem 0 0.75rem;
-          color: white;
+          grid-template-columns: 1fr 2.5rem;
+          .content {
+            background: var(--primary-color);
+            border-radius: 0.5rem;
+            color: white;
+            &::before {
+              border-top: 7px solid transparent;
+              border-bottom: 7px solid transparent;
+              border-left: 10px solid var(--primary-color);
+              left: unset;
+              right: -7px;
+            }
+          }
+        }
+        .msgAvatar {
+          position: relative;
+          // height: 2.5rem;
+          width: 2.5rem;
+          aspect-ratio: 0.65;
+          // border: 1px solid red;
+          .img {
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            height: 2.5rem;
+            width: 2.5rem;
+            font-size: 1.3rem;
+            background: rgb(16, 156, 250);
+            color: white;
+            margin-top: -0.15rem;
+          }
+          time {
+            color: rgb(66, 66, 66);
+            position: absolute;
+            font-size: 0.75rem;
+            left: 50%;
+            top: 2.7rem;
+            transform: translateX(-50%);
+          }
+          &.assistant {
+            background: transparent;
+            // width: 2.2rem;
+            img {
+              position: absolute;
+              right: -3.5px;
+              margin-top: -8px;
+              width: 130%;
+            }
+            time {
+              top: 3rem;
+            }
+          }
         }
         .actions {
-          // position: absolute;
-          // top: 50%;
-          // right: -1.5rem;
-          // transform: translateY(-50%);
-          // flex-direction: column;
           display: flex;
           justify-content: flex-end;
-          // grid-gap: 0.3rem;
           margin-top: 0.2rem;
           button {
             height: 2.1rem;
@@ -249,7 +318,7 @@
             background: none;
             cursor: pointer;
             border: none;
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             outline: none;
             display: grid;
             place-items: center;
@@ -267,17 +336,35 @@
           word-break: break-word;
         }
       }
+      .msgDate {
+        width: 100%;
+        background: rgb(173, 173, 173);
+        height: 1px;
+        margin-bottom: 30px;
+        time {
+          position: relative;
+          background: #f0f0f0;
+          display: inline-block;
+          left: 50%;
+          top: 50%;
+          padding: 0.2rem 0.4rem;
+          transform: translate(-50%, -50%);
+          font-size: 0.8rem;
+          color: rgb(66, 66, 66);
+        }
+      }
       .suggestions {
         display: flex;
         flex-wrap: wrap;
         grid-gap: 0.5rem;
+        margin-left: 55px;
       }
     }
     .chatForm {
       /* width: 100%; */
       display: flex;
       border-top: 1px solid rgb(235, 234, 234);
-      background: var(--primary-color);
+      background: white;
       border-radius: 0 0 0.5rem 0.5rem;
       grid-gap: 0.5rem;
       padding: 0.5rem;
@@ -295,15 +382,13 @@
         border-radius: 0.3rem;
         border: none;
         display: grid;
-        background: white;
+        background: var(--primary-color);
+        color: white;
         width: 2.2rem;
         display: flex;
         align-items: center;
         grid-gap: 3px;
         justify-content: center;
-        .dot {
-          background: var(--primary-color);
-        }
       }
     }
   }

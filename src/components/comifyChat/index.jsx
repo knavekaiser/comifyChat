@@ -5,6 +5,7 @@ import React, {
   useState,
   useEffect,
   useContext,
+  Fragment,
 } from "react";
 import s from "./style.module.scss";
 import { useFetch } from "./utils/useFetch.js";
@@ -16,6 +17,7 @@ import {
 } from "./context.js";
 import { Toast } from "./toast.js";
 import Icon from "./icons.js";
+import { Moment } from "./moment";
 
 export default function ComifyChat({
   baseUrl = "https://comify.in",
@@ -248,35 +250,53 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
 
       <div className={s.messages} ref={messagesRef}>
         {(convo?._id ? [...messages, ...initMessages] : initMessages).map(
-          (item, i, arr) =>
-            item.type === "suggestion" ? (
-              <Suggestions
-                key={item._id}
-                options={[...item.options, "URL"]}
-                active={convo?.url ? "URL" : convo?.topic}
-                onChange={async (input) => {
-                  await wait(200);
+          (item, i, arr) => (
+            <Fragment key={item._id}>
+              {item.type === "suggestion" ? (
+                <Suggestions
+                  options={[...item.options, "URL"]}
+                  active={convo?.url ? "URL" : convo?.topic}
+                  onChange={async (input) => {
+                    await wait(200);
 
-                  const name = convo?.user?.name || convo?.name || user?.name;
-                  const email =
-                    convo?.user?.email || convo?.email || user?.email;
-                  setConvo({
-                    topic: input,
-                    name,
-                    email,
-                  });
+                    const name = convo?.user?.name || convo?.name || user?.name;
+                    const email =
+                      convo?.user?.email || convo?.email || user?.email;
+                    setConvo({
+                      topic: input,
+                      name,
+                      email,
+                    });
 
-                  setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
+                    setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
 
-                  if (!convo?._id) {
-                    if (input === "URL") {
+                    if (!convo?._id) {
+                      if (input === "URL") {
+                        setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            ...(name ? { name } : { askName: true }),
+                            ...(email ? { email } : { askEmail: !!name }),
+                            ...(name && email ? { askUrl: true } : {}),
+                          })
+                        );
+                        if (!name) {
+                          setCurrInput("name");
+                        } else if (!email) {
+                          setCurrInput("email");
+                        } else if (name && email) {
+                          setCurrInput("url");
+                        }
+                        return;
+                      }
                       setInitMessages(
                         generateMessages({
                           topics,
                           topic: input,
                           ...(name ? { name } : { askName: true }),
                           ...(email ? { email } : { askEmail: !!name }),
-                          ...(name && email ? { askUrl: true } : {}),
+                          ...(name && email ? { askQuery: true } : {}),
                         })
                       );
                       if (!name) {
@@ -284,71 +304,73 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                       } else if (!email) {
                         setCurrInput("email");
                       } else if (name && email) {
-                        setCurrInput("url");
-                      }
-                      return;
-                    }
-                    setInitMessages(
-                      generateMessages({
-                        topics,
-                        topic: input,
-                        ...(name ? { name } : { askName: true }),
-                        ...(email ? { email } : { askEmail: !!name }),
-                        ...(name && email ? { askQuery: true } : {}),
-                      })
-                    );
-                    if (!name) {
-                      setCurrInput("name");
-                    } else if (!email) {
-                      setCurrInput("email");
-                    } else if (name && email) {
-                      setCurrInput("query");
-                    }
-                  } else {
-                    if (input === "URL") {
-                      setInitMessages(
-                        generateMessages({
-                          topics,
-                          topic: input,
-                          name,
-                          email,
-                          askUrl: true,
-                        })
-                      );
-                      if (name && email) {
-                        setCurrInput("url");
+                        setCurrInput("query");
                       }
                     } else {
-                      setInitMessages(
-                        generateMessages({
-                          topics,
-                          topic: input,
-                          input,
-                          name,
-                          email,
-                          askQuery: true,
-                        })
-                      );
-                      setCurrInput("query");
-                    }
+                      if (input === "URL") {
+                        setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            name,
+                            email,
+                            askUrl: true,
+                          })
+                        );
+                        if (name && email) {
+                          setCurrInput("url");
+                        }
+                      } else {
+                        setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            input,
+                            name,
+                            email,
+                            askQuery: true,
+                          })
+                        );
+                        setCurrInput("query");
+                      }
 
-                    setMessages([]);
-                    localStorage.removeItem("comify_chat_id");
-                    messagesRef.current.scrollTop = 0;
-                  }
-                }}
-              />
-            ) : (
-              <Message
-                key={item._id}
-                msg={item}
-                loading={loading}
-                style={{
-                  marginBottom: arr[i - 1]?.role !== item.role ? 5 : 0,
-                }}
-                castVote={vote}
-              />
-            )
+                      setMessages([]);
+                      localStorage.removeItem("comify_chat_id");
+                      messagesRef.current.scrollTop = 0;
+                    }
+                  }}
+                  style={{
+                    marginBottom:
+                      arr[i - 1]?.type === "suggestion"
+                        ? 5
+                        : arr[i - 1] && arr[i - 1]?.role !== item.role
+                        ? 25
+                        : 0,
+                  }}
+                />
+              ) : (
+                <Message
+                  msg={item}
+                  loading={loading}
+                  style={{
+                    marginBottom:
+                      arr[i - 1]?.type === "suggestion"
+                        ? 5
+                        : arr[i - 1] && arr[i - 1]?.role !== item.role
+                        ? 25
+                        : 0,
+                  }}
+                  castVote={vote}
+                />
+              )}
+              {new Date(item.createdAt).getDate() !==
+                new Date(arr[i + 1]?.createdAt).getDate() && (
+                <div className={s.msgDate}>
+                  <Moment format="DD MMM YYYY">{item.createdAt}</Moment>
+                </div>
+              )}
+            </Fragment>
+          )
         )}
       </div>
 
@@ -473,39 +495,62 @@ const Avatar = ({ onClick }) => {
 };
 
 const Message = ({ msg, castVote, loading, style }) => {
+  const { user, endpoints } = useContext(ChatContext);
+
   return (
     <div className={`${s.msg} ${s[msg.role]}`} style={style}>
-      <p className={s.content}>{msg.content}</p>
-      {msg.role === "assistant" && (
-        <div className={s.actions}>
-          <CopyBtn content={msg.content} />
-          <button
-            className={s.btn}
-            title="Like"
-            disabled={loading}
-            onClick={() => castVote(msg._id, msg.like ? null : true)}
-          >
-            <Icon name={msg.like ? "thumbs-up" : "thumbs-up-outlined"} />
-          </button>
-          <button
-            className={s.btn}
-            title="Dislike"
-            disabled={loading}
-            onClick={() => castVote(msg._id, msg.like === false ? null : false)}
-          >
-            <Icon
-              name={msg.like === false ? "thumbs-down" : "thumbs-down-outlined"}
-            />
-          </button>
+      {msg.role !== "user" && (
+        <div className={`${s.msgAvatar} ${s.assistant}`}>
+          <img
+            className={s.hand}
+            src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/full.webp"}
+          />
+          <Moment format="hh:mm">{msg.createdAt}</Moment>
+        </div>
+      )}
+      <div className={s.content}>
+        <p>{msg.content}</p>
+        {msg.role === "assistant" && (
+          <div className={s.actions}>
+            <CopyBtn content={msg.content} />
+            <button
+              className={s.btn}
+              title="Like"
+              disabled={loading}
+              onClick={() => castVote(msg._id, msg.like ? null : true)}
+            >
+              <Icon name={msg.like ? "thumbs-up" : "thumbs-up-outlined"} />
+            </button>
+            <button
+              className={s.btn}
+              title="Dislike"
+              disabled={loading}
+              onClick={() =>
+                castVote(msg._id, msg.like === false ? null : false)
+              }
+            >
+              <Icon
+                name={
+                  msg.like === false ? "thumbs-down" : "thumbs-down-outlined"
+                }
+              />
+            </button>
+          </div>
+        )}
+      </div>
+      {msg.role === "user" && (
+        <div className={s.msgAvatar}>
+          <div className={s.img}>{user?.name?.[0] || "U"}</div>
+          <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
       )}
     </div>
   );
 };
 
-const Suggestions = ({ options, active, onChange }) => {
+const Suggestions = ({ options, active, onChange, style }) => {
   return (
-    <div className={s.suggestions} style={{ marginBottom: ".3rem" }}>
+    <div className={s.suggestions} style={{ ...style }}>
       {options.map((item) => (
         <button
           disabled={item === active}
