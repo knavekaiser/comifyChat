@@ -124,10 +124,10 @@ export const ChatContextProvider = ({ children, endpoints }) => {
       ...prev,
     ]);
 
-    // window[`comify_toast_timeout_${id}`] = setTimeout(() => {
-    //   setToasts((prev) => prev.filter((item) => item.id !== id));
-    //   delete window[`comify_toast_timeout_${id}`];
-    // }, 3000);
+    window[`comify_toast_timeout_${id}`] = setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+      delete window[`comify_toast_timeout_${id}`];
+    }, 3000);
   }, []);
   const pushToast = {
     success: (message) => _pushToast("success", message),
@@ -153,10 +153,11 @@ export const ChatContextProvider = ({ children, endpoints }) => {
       })
       .catch((err) => pushToast.error(err.message));
 
-    if (localStorage.getItem("comify_chat_id")) {
+    const chatId = localStorage.getItem("comify_chat_id");
+    if (chatId) {
       getChat({
         params: {
-          ":chat_id": localStorage.getItem("comify_chat_id"),
+          ":chat_id": chatId,
         },
       })
         .then(({ data }) => {
@@ -176,6 +177,11 @@ export const ChatContextProvider = ({ children, endpoints }) => {
           }
         })
         .catch((err) => console.log(err));
+    }
+    const name = localStorage.getItem("comify_chat_user_name");
+    const email = localStorage.getItem("comify_chat_user_email");
+    if (name && email) {
+      setUser({ name, email });
     }
 
     msgChannel.current = new BroadcastChannel("comify-chat-message");

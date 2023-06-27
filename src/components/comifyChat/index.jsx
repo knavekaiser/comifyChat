@@ -75,6 +75,7 @@ const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
 const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   const chatRef = useRef();
   const {
+    user,
     setUser,
     endpoints,
     convo,
@@ -143,6 +144,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
             return pushToast.error(data.message);
           }
           localStorage.setItem("comify_chat_id", data.data._id);
+          localStorage.setItem("comify_chat_user_name", data.data.user.name);
+          localStorage.setItem("comify_chat_user_email", data.data.user.email);
           setConvo({ ...data.data, messages: undefined });
           msgChannel.postMessage({ messages: data.data.messages.reverse() });
           setMessages(data.data.messages);
@@ -168,6 +171,11 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                 msgChannel.postMessage({ messages: [] });
                 setInitMessages(generateMessages({ topics }));
                 setMessages([]);
+                localStorage.setItem("comify_chat_user_name", convo.user.name);
+                localStorage.setItem(
+                  "comify_chat_user_email",
+                  convo.user.email
+                );
                 localStorage.removeItem("comify_chat_id");
               }}
             >
@@ -249,8 +257,9 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                 onChange={async (input) => {
                   await wait(200);
 
-                  const name = convo?.user?.name || convo?.name;
-                  const email = convo?.user?.email || convo?.email;
+                  const name = convo?.user?.name || convo?.name || user?.name;
+                  const email =
+                    convo?.user?.email || convo?.email || user?.email;
                   setConvo({
                     topic: input,
                     name,
