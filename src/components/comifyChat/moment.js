@@ -1,3 +1,5 @@
+import React from "react";
+
 function splitDate(str, parts) {
   let result = [];
   let i = 0;

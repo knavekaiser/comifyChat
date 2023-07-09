@@ -2,6 +2,7 @@
   --primary-color: #0084ff;
   --green: rgb(34, 189, 99);
   --red: rgb(189, 34, 60);
+  --chat-width: 22rem;
 }
 
 .chatContainer {
@@ -12,7 +13,8 @@
     padding: 0;
     margin: 0;
   }
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Verdana, Geneva, Tahoma, Inter, system-ui, Avenir, Helvetica,
+    Arial, sans-serif;
   position: fixed;
   right: 1rem;
   bottom: 1rem;
@@ -62,9 +64,9 @@
   .chat {
     box-shadow: 0 10px 58px 0 rgba(#8e7aff, 0.5);
     height: 30rem;
-    background: #f0f0f0;
+    background: white;
     color: black;
-    width: 20rem;
+    width: var(--chat-width);
     border-radius: 0.5rem;
     // border: 1px solid rgba(54, 54, 54, 0.363);
     display: grid;
@@ -75,13 +77,13 @@
       grid-gap: 0.5rem;
     }
     .header {
-      background: white;
+      background: var(--primary-color);
       border-radius: 0.5rem 0.5rem 0 0;
       padding: 0.5rem;
       display: flex;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
       font-size: 0.9rem;
-      color: rgb(53, 53, 53);
+      color: white;
       button {
         align-items: center;
         outline: none;
@@ -91,7 +93,7 @@
         padding: 0;
         border: none;
         cursor: pointer;
-        color: rgb(53, 53, 53);
+        color: white;
         // color: white;
         background: none;
       }
@@ -221,6 +223,7 @@
         font-style: italic;
       }
       .msg {
+        font-size: 0.95rem;
         height: min-content;
         margin-right: auto;
         display: grid;
@@ -228,9 +231,9 @@
         grid-gap: 12px;
         align-items: flex-start;
         .content {
-          border-radius: 0.5rem;
+          border-radius: 1rem;
           position: relative;
-          background: white;
+          background: #f0f0f0;
           position: relative;
           padding: 0.5rem 0.8rem;
           &::before {
@@ -247,7 +250,7 @@
             &::before {
               border-top: 7px solid transparent;
               border-bottom: 7px solid transparent;
-              border-right: 10px solid white;
+              border-right: 10px solid #f0f0f0;
             }
           }
         }
@@ -257,7 +260,7 @@
           grid-template-columns: 1fr 2.5rem;
           .content {
             background: var(--primary-color);
-            border-radius: 0.5rem;
+            border-radius: 1rem;
             color: white;
             &::before {
               border-top: 7px solid transparent;
@@ -334,23 +337,46 @@
         .content {
           margin: 0;
           word-break: break-word;
+          form {
+            margin-top: 1rem;
+            display: grid;
+            grid-gap: 1rem;
+            label {
+              color: rgba(0, 0, 0, 0.6);
+              font-size: 0.75rem;
+            }
+            input {
+              width: 100%;
+              padding: 0.3rem;
+              border-radius: 0.5rem;
+              border: 1px solid rgba(0, 0, 0, 0.2);
+            }
+            button {
+              color: white;
+              background: var(--primary-color);
+              padding: 0.5rem 1rem;
+              border: none;
+              border-radius: 0.5rem;
+              font-size: 1rem;
+            }
+          }
         }
       }
       .msgDate {
         width: 100%;
-        background: rgb(173, 173, 173);
+        background: rgb(224, 224, 224);
         height: 1px;
         margin-bottom: 30px;
         time {
           position: relative;
-          background: #f0f0f0;
+          background: white;
           display: inline-block;
           left: 50%;
           top: 50%;
           padding: 0.2rem 0.4rem;
           transform: translate(-50%, -50%);
           font-size: 0.8rem;
-          color: rgb(66, 66, 66);
+          color: rgb(109, 109, 109);
         }
       }
       .suggestions {
@@ -402,13 +428,15 @@
     grid-gap: 0.5rem;
     border-radius: 0.5rem;
     .toast {
-      width: 20rem;
+      width: var(--chat-width);
       padding: 0.5rem;
       border-radius: 0.5rem;
       display: grid;
       grid-template-columns: 1fr min-content;
       align-items: center;
+      color: white;
       button {
+        border: none;
         display: grid;
         background: none;
         color: white;
@@ -430,11 +458,11 @@
 .chip {
   background: white;
   color: gray;
-  border: 1px solid var(--primary-color);
-  font-size: 0.95rem;
+  border: 2px solid var(--primary-color);
+  font-size: 0.9rem;
   font-weight: 400;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
   cursor: pointer;
   &.active {
     background: var(--primary-color);

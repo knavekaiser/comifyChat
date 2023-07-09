@@ -32,8 +32,11 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
-      <ChatContextProvider endpoints={getEndpoints()}>
-        <ComifyChat false />
+      <ChatContextProvider
+        endpoints={getEndpoints()}
+        defaultUrl={window.location.hostname}
+      >
+        <ComifyChat defaultUrl={window.location.hostname} />
       </ChatContextProvider>
     </>
   );

@@ -21,6 +21,7 @@ import { Moment } from "./moment";
 
 export default function ComifyChat({
   baseUrl = "https://comify.in",
+  defaultUrl = window.location.hostname,
   openAtStart,
 } = {}) {
   const containerId = "comifyChat_container";
@@ -31,14 +32,20 @@ export default function ComifyChat({
 
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
-      <ChatContextProvider endpoints={getEndpoints(baseUrl)}>
-        <ChatContainer openAtStart={openAtStart} />
+      <ChatContextProvider
+        endpoints={getEndpoints(baseUrl)}
+        defaultUrl={defaultUrl?.replace(/https?:\/\/(www\.)?/, "")}
+      >
+        <ChatContainer
+          openAtStart={openAtStart}
+          defaultUrl={defaultUrl?.replace(/https?:\/\/(www\.)?/, "")}
+        />
       </ChatContextProvider>
     </React.StrictMode>
   );
 }
 
-export function ChatContainer({ openAtStart }) {
+export function ChatContainer({ openAtStart, defaultUrl }) {
   const [fullScreen, setFullScreen] = useState(false);
   const { setUser, toasts } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
@@ -57,6 +64,7 @@ export function ChatContainer({ openAtStart }) {
       </div>
       {open ? (
         <Chat
+          defaultUrl={defaultUrl}
           setOpen={setOpen}
           setUser={setUser}
           fullScreen={fullScreen}
@@ -74,9 +82,10 @@ export function ChatContainer({ openAtStart }) {
 
 const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
 
-const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
+const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
   const chatRef = useRef();
   const {
+    unmountChat,
     user,
     setUser,
     endpoints,
@@ -124,19 +133,19 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
     [convo]
   );
 
-  const { post: initChat_post, loading: initiatingChat } = useFetch(
+  const { post: sendMessage, loading: initiatingChat } = useFetch(
     endpoints.chat
   );
   const initChat = useCallback(
-    (msg) => {
-      initChat_post(
+    (msg, userDetail = {}) => {
+      sendMessage(
         {
-          ...(convo?.topic && convo.topic !== "URL" && { topic: convo.topic }),
-          ...(convo?.url && {
-            url: convo.url,
-          }),
+          ...(convo?.topic &&
+            convo.topic !== defaultUrl && { topic: convo.topic }),
+          ...(convo?.topic === defaultUrl && { url: "https://" + defaultUrl }),
           name: convo.name,
           email: convo.email,
+          ...userDetail,
           message: msg,
         },
         { params: { ":chat_id": "" } }
@@ -152,10 +161,22 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
           msgChannel.postMessage({ messages: data.data.messages.reverse() });
           setMessages(data.data.messages);
         })
-        .catch((err) => pushToast.error(err.message));
+        .catch((err) => {
+          pushToast.error(err.message);
+          if (err.status === 401) {
+            setOpen(false);
+            unmountChat();
+          }
+        });
     },
     [convo]
   );
+
+  useEffect(() => {
+    if (!topics?.length && convo?.topic === defaultUrl) {
+      setCurrInput("query");
+    }
+  }, [topics, convo?.topic]);
 
   return (
     <div
@@ -184,7 +205,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
               <Icon name="clear" />
             </button>
             <span title={convo.topic} className={s.title}>
-              {convo.url ? "URL" : convo.topic}
+              {convo.topic}
             </span>
           </div>
         )}
@@ -252,21 +273,67 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
         {(convo?._id ? [...messages, ...initMessages] : initMessages).map(
           (item, i, arr) => (
             <Fragment key={item._id}>
-              {item.type === "suggestion" ? (
+              {item.type === "form" && (
+                <MessageForm
+                  msg={item}
+                  onSubmit={(values) => {
+                    console.log("setting user detail", values);
+                    setConvo((prev) => ({
+                      ...prev,
+                      name: values.name,
+                      email: values.email,
+                    }));
+                    if (!topics?.length && convo.topic === defaultUrl) {
+                      const query = initMessages.find(
+                        (item) => item._id === "queryResponse"
+                      )?.content;
+                      setInitMessages(generateMessages({}));
+                      initChat(query, {
+                        name: values.name,
+                        email: values.email,
+                      });
+                    } else {
+                      setCurrInput("query");
+                      return setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: convo.topic,
+                          askQuery: true,
+                        })
+                      );
+                    }
+                  }}
+                />
+              )}
+              {item.type === "suggestion" && (
                 <Suggestions
-                  options={[...item.options, "URL"]}
-                  active={convo?.url ? "URL" : convo?.topic}
+                  options={[
+                    ...item.options,
+                    ...(defaultUrl ? [defaultUrl] : []),
+                  ]}
+                  active={convo?.topic}
                   onChange={async (input) => {
                     await wait(200);
 
                     const name = convo?.user?.name || convo?.name || user?.name;
                     const email =
                       convo?.user?.email || convo?.email || user?.email;
+
                     setConvo({
                       topic: input,
                       name,
                       email,
                     });
+
+                    if (!name || !email) {
+                      return setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: input,
+                          askUserDetail: true,
+                        })
+                      );
+                    }
 
                     setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
 
@@ -348,7 +415,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                         : 0,
                   }}
                 />
-              ) : (
+              )}
+              {!("type" in item) && (
                 <Message
                   msg={item}
                   loading={loading}
@@ -374,8 +442,9 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
         )}
       </div>
 
-      {!convo?._id && ["", "name", "email", "url"].includes(currInput) && (
+      {false && !convo?._id && [""].includes(currInput) && (
         <ChatForm
+          setOpen={setOpen}
           inputOptions={{
             type: currInput === "email" ? "email" : "text",
             readOnly: !(convo?.topic || convo?.url),
@@ -451,6 +520,20 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
       {!convo?._id && currInput === "query" && (
         <ChatForm
           onSubmit={(values, options) => {
+            if (
+              !topics?.length &&
+              convo?.topic === defaultUrl &&
+              (!convo.name || !convo.email)
+            ) {
+              setInitMessages(
+                generateMessages({
+                  queryResponse: values.msg,
+                  askUserDetail: true,
+                })
+              );
+              setCurrInput("");
+              return;
+            }
             initChat(values.msg);
           }}
           scrollDown={() => {
@@ -548,6 +631,58 @@ const Message = ({ msg, castVote, loading, style }) => {
   );
 };
 
+const MessageForm = ({ msg, style, onSubmit }) => {
+  const [values, setValues] = useState({});
+  const { endpoints } = useContext(ChatContext);
+
+  return (
+    <div className={`${s.msg} ${s.form}`} style={style}>
+      {msg.role !== "user" && (
+        <div className={`${s.msgAvatar} ${s.assistant}`}>
+          <img
+            className={s.hand}
+            src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/full.webp"}
+          />
+          <Moment format="hh:mm">{msg.createdAt}</Moment>
+        </div>
+      )}
+      <div className={s.content}>
+        <p>{msg.content}</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit(values);
+          }}
+        >
+          {(msg.fields || []).map((field) => {
+            if (field.inputType === "input") {
+              return (
+                <section key={field.name}>
+                  <label htmlFor={field.name}>{field.label}</label>
+                  <input
+                    name={field.name}
+                    required={field.required}
+                    value={values[field.name] || ""}
+                    type={field.type || "text"}
+                    onChange={(e) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        [field.name]: e.target.value,
+                      }))
+                    }
+                  />
+                </section>
+              );
+            }
+            return null;
+          })}
+          <button type="submit">Submit</button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const Suggestions = ({ options, active, onChange, style }) => {
   return (
     <div className={s.suggestions} style={{ ...style }}>
@@ -590,6 +725,7 @@ const CopyBtn = ({ content }) => {
 };
 
 const ChatForm = ({
+  setOpen,
   inputOptions,
   scrollDown,
   onSubmit,
@@ -617,6 +753,7 @@ const ChatForm = ({
                 role: "user",
                 name: "Guest",
                 content: msg,
+                createdAt: new Date(),
               },
               ...prev,
             ];
@@ -626,7 +763,13 @@ const ChatForm = ({
           setMsg("");
           setTimeout(() => scrollDown(), 50);
         })
-        .catch((err) => pushToast.error(err.message));
+        .catch((err) => {
+          pushToast.error(err.message);
+          if (err.status === 401) {
+            setOpen(false);
+            unmountChat();
+          }
+        });
     },
     [msg]
   );

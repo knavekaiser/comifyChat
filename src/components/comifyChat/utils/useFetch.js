@@ -46,6 +46,12 @@ export const useFetch = (url) => {
           signal: controller.current.signal,
         })
           .then(async (res) => {
+            if (res.status === 401) {
+              return reject({
+                status: 401,
+                message: "Chatbot has not been setup properly.",
+              });
+            }
             let data = await res.json();
             setLoading(false);
             resolve({ res, data });

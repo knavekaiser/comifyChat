@@ -13,6 +13,7 @@ export const generateMessages = ({
   chatStartedAt = new Date(),
   topics,
   topic,
+  askUserDetail,
   url,
   askUrl,
   name,
@@ -20,17 +21,19 @@ export const generateMessages = ({
   email,
   askEmail,
   askQuery,
+  queryResponse,
 }) => {
   const messages = [
     {
       _id: "greetings",
       role: "system",
-      content:
-        "Hello, how may I help you today? Please pick a topic from below with which I can assist you:",
+      content: topics?.length
+        ? "Hello, how may I help you today? Please pick a topic from below with which I can assist you:"
+        : "Hello, how may I help you today?",
       createdAt: chatStartedAt,
     },
   ];
-  if (topics) {
+  if (topics?.length) {
     messages.unshift({
       _id: "topicQuery",
       type: "suggestion",
@@ -46,54 +49,87 @@ export const generateMessages = ({
       createdAt: chatStartedAt,
     });
   }
-  if (askName || name) {
+  if (queryResponse) {
     messages.unshift({
-      _id: "nameQuery",
-      role: "system",
-      content: "Please enter your name",
-      createdAt: chatStartedAt,
-    });
-  }
-  if (name) {
-    messages.unshift({
-      _id: "nameResponse",
+      _id: "queryResponse",
       role: "user",
-      content: name,
+      content: queryResponse,
       createdAt: chatStartedAt,
     });
   }
-  if (askEmail || email) {
+  if (askUserDetail) {
     messages.unshift({
-      _id: "emailQuery",
+      _id: "askUserDetail",
       role: "system",
-      content: "Please enter your email",
+      type: "form",
+      content: "We just need some more infomration from you to proceed:",
       createdAt: chatStartedAt,
+      fields: [
+        {
+          inputType: "input",
+          label: "Name",
+          type: "text",
+          name: "name",
+          required: true,
+        },
+        {
+          inputType: "input",
+          label: "Email",
+          type: "email",
+          name: "email",
+          required: true,
+        },
+      ],
     });
   }
-  if (email) {
-    messages.unshift({
-      _id: "emailResponse",
-      role: "user",
-      content: email,
-      createdAt: chatStartedAt,
-    });
-  }
-  if (askUrl || url) {
-    messages.unshift({
-      _id: "urlQuery",
-      role: "system",
-      content: "Please enter a URL",
-      createdAt: chatStartedAt,
-    });
-  }
-  if (url) {
-    messages.unshift({
-      _id: "urlResponse",
-      role: "user",
-      content: url,
-      createdAt: chatStartedAt,
-    });
-  }
+  // if (askName || name) {
+  //   messages.unshift({
+  //     _id: "nameQuery",
+  //     role: "system",
+  //     content: "Please enter your name",
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
+  // if (name) {
+  //   messages.unshift({
+  //     _id: "nameResponse",
+  //     role: "user",
+  //     content: name,
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
+  // if (askEmail || email) {
+  //   messages.unshift({
+  //     _id: "emailQuery",
+  //     role: "system",
+  //     content: "Please enter your email",
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
+  // if (email) {
+  //   messages.unshift({
+  //     _id: "emailResponse",
+  //     role: "user",
+  //     content: email,
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
+  // if (askUrl || url) {
+  //   messages.unshift({
+  //     _id: "urlQuery",
+  //     role: "system",
+  //     content: "Please enter a URL",
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
+  // if (url) {
+  //   messages.unshift({
+  //     _id: "urlResponse",
+  //     role: "user",
+  //     content: url,
+  //     createdAt: chatStartedAt,
+  //   });
+  // }
   if (askQuery) {
     messages.unshift({
       _id: "queryQuery",
@@ -110,7 +146,7 @@ function resizeWindow() {
   document.body.style.setProperty("--vh", `${vh}px`);
 }
 
-export const ChatContextProvider = ({ children, endpoints }) => {
+export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
   const msgChannel = useRef();
   const [toasts, setToasts] = useState([]);
   const [user, setUser] = useState(null);
@@ -120,6 +156,7 @@ export const ChatContextProvider = ({ children, endpoints }) => {
   const [initMessages, setInitMessages] = useState(
     generateMessages({ topics: [] })
   );
+  const [botStatus, setBotStatus] = useState("active");
 
   const { get: getTopics } = useFetch(endpoints.topics);
   const { get: getChat } = useFetch(endpoints.chat);
@@ -145,6 +182,16 @@ export const ChatContextProvider = ({ children, endpoints }) => {
     error: (message) => _pushToast("error", message),
   };
 
+  const unmountChat = useCallback(() => {
+    setTimeout(() => {
+      const container = document.querySelector("#comifyChat_container");
+      setBotStatus("inactive");
+      if (container) {
+        container.remove();
+      }
+    }, 3000);
+  }, []);
+
   useEffect(() => {
     window.addEventListener("resize", () => resizeWindow());
     resizeWindow();
@@ -153,43 +200,76 @@ export const ChatContextProvider = ({ children, endpoints }) => {
       .then(({ data }) => {
         if (data.success) {
           setTopics(data.data);
-          setInitMessages((prev) =>
-            prev.map((item) =>
-              item._id === "topicQuery" ? { ...item, options: data.data } : item
-            )
-          );
+          // setInitMessages(
+          //   generateMessages({
+          //     topics,
+          //   })
+          // );
+          // setInitMessages((prev) =>
+          //   prev.map((item) =>
+          //     item._id === "topicQuery" ? { ...item, options: data.data } : item
+          //   )
+          // );
+          return data.data;
         } else {
+          return null;
           // alert(data.message);
         }
       })
-      .catch((err) => pushToast.error(err.message));
-
-    const chatId = localStorage.getItem("comify_chat_id");
-    if (chatId) {
-      getChat({
-        params: {
-          ":chat_id": chatId,
-        },
+      .then((topics) => {
+        const chatId = localStorage.getItem("comify_chat_id");
+        if (chatId) {
+          getChat({
+            params: {
+              ":chat_id": chatId,
+            },
+          })
+            .then(({ data }) => {
+              if (data.success) {
+                setConvo({ ...data.data, topics, messages: undefined });
+                setMessages(data.data.messages.reverse());
+                setInitMessages(
+                  generateMessages({
+                    chatStartedAt: new Date(data.data.createdAt),
+                    topics,
+                    topic: data.data.topic,
+                    // url: data.data.url,
+                    // name: data.data.user.name,
+                    // email: data.data.user.email,
+                    askQuery: true,
+                  })
+                );
+              } else {
+                setConvo({
+                  topic: defaultUrl,
+                  name: localStorage.getItem("comify_chat_user_name"),
+                  email: localStorage.getItem("comify_chat_user_email"),
+                });
+              }
+            })
+            .catch((err) => console.log(err));
+        } else {
+          setConvo({
+            topic: !topics?.length ? defaultUrl : null,
+            topics,
+            name: localStorage.getItem("comify_chat_user_name"),
+            email: localStorage.getItem("comify_chat_user_email"),
+          });
+          setInitMessages(
+            generateMessages({
+              topics,
+              // topic: !topics?.length ? defaultUrl : null,
+            })
+          );
+        }
       })
-        .then(({ data }) => {
-          if (data.success) {
-            setConvo({ ...data.data, messages: undefined });
-            setMessages(data.data.messages.reverse());
-            setInitMessages(
-              generateMessages({
-                chatStartedAt: new Date(data.data.createdAt),
-                topics,
-                topic: data.data.topic,
-                url: data.data.url,
-                name: data.data.user.name,
-                email: data.data.user.email,
-                askQuery: true,
-              })
-            );
-          }
-        })
-        .catch((err) => console.log(err));
-    }
+      .catch((err) => {
+        pushToast.error(err.message);
+        if (err.status === 401) {
+          unmountChat();
+        }
+      });
+
     const name = localStorage.getItem("comify_chat_user_name");
     const email = localStorage.getItem("comify_chat_user_email");
     if (name && email) {
@@ -227,7 +307,7 @@ export const ChatContextProvider = ({ children, endpoints }) => {
         setInitMessages,
       }}
     >
-      {children}
+      {botStatus === "active" ? children : null}
     </ChatContext.Provider>
   );
 };
