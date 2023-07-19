@@ -33,10 +33,11 @@ function App() {
         Click on the Vite and React logos to learn more
       </p>
       <ChatContextProvider
+        chatbot_id={"64ad0fab0efb0096d63baf15"}
         endpoints={getEndpoints()}
         defaultUrl={window.location.hostname}
       >
-        <ComifyChat defaultUrl={window.location.hostname} />
+        <ComifyChat openAtStart defaultUrl={window.location.hostname} />
       </ChatContextProvider>
     </>
   );

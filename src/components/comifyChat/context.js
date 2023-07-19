@@ -14,12 +14,6 @@ export const generateMessages = ({
   topics,
   topic,
   askUserDetail,
-  url,
-  askUrl,
-  name,
-  askName,
-  email,
-  askEmail,
   askQuery,
   queryResponse,
 }) => {
@@ -82,54 +76,6 @@ export const generateMessages = ({
       ],
     });
   }
-  // if (askName || name) {
-  //   messages.unshift({
-  //     _id: "nameQuery",
-  //     role: "system",
-  //     content: "Please enter your name",
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
-  // if (name) {
-  //   messages.unshift({
-  //     _id: "nameResponse",
-  //     role: "user",
-  //     content: name,
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
-  // if (askEmail || email) {
-  //   messages.unshift({
-  //     _id: "emailQuery",
-  //     role: "system",
-  //     content: "Please enter your email",
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
-  // if (email) {
-  //   messages.unshift({
-  //     _id: "emailResponse",
-  //     role: "user",
-  //     content: email,
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
-  // if (askUrl || url) {
-  //   messages.unshift({
-  //     _id: "urlQuery",
-  //     role: "system",
-  //     content: "Please enter a URL",
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
-  // if (url) {
-  //   messages.unshift({
-  //     _id: "urlResponse",
-  //     role: "user",
-  //     content: url,
-  //     createdAt: chatStartedAt,
-  //   });
-  // }
   if (askQuery) {
     messages.unshift({
       _id: "queryQuery",
@@ -146,8 +92,27 @@ function resizeWindow() {
   document.body.style.setProperty("--vh", `${vh}px`);
 }
 
-export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
+function hexToRgba(hex) {
+  // Remove the hash symbol if present
+  hex = hex.replace("#", "");
+
+  // Handle shorthand hex values and convert them to full-length
+  if (hex.length === 3) {
+    hex = hex.replace(/(.)/g, "$1$1");
+  }
+
+  // Extract the individual RGBA components
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const a = hex.length === 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
+
+  return [r, g, b];
+}
+
+export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
   const msgChannel = useRef();
+  const [chatbotConfig, setChatbotConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [user, setUser] = useState(null);
   const [convo, setConvo] = useState(null);
@@ -160,6 +125,7 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
 
   const { get: getTopics } = useFetch(endpoints.topics);
   const { get: getChat } = useFetch(endpoints.chat);
+  const { get: getConfig } = useFetch(endpoints.chatbotConfig);
 
   const _pushToast = useCallback((type, message) => {
     const id = Math.random().toString(36).substring(2);
@@ -172,9 +138,9 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
       ...prev,
     ]);
 
-    window[`comify_toast_timeout_${id}`] = setTimeout(() => {
+    window[`infinai_toast_timeout_${id}`] = setTimeout(() => {
       setToasts((prev) => prev.filter((item) => item.id !== id));
-      delete window[`comify_toast_timeout_${id}`];
+      delete window[`infinai_toast_timeout_${id}`];
     }, 3000);
   }, []);
   const pushToast = {
@@ -184,7 +150,7 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
 
   const unmountChat = useCallback(() => {
     setTimeout(() => {
-      const container = document.querySelector("#comifyChat_container");
+      const container = document.querySelector("#infinaiChat_container");
       setBotStatus("inactive");
       if (container) {
         container.remove();
@@ -196,28 +162,36 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
     window.addEventListener("resize", () => resizeWindow());
     resizeWindow();
 
-    getTopics()
-      .then(({ data }) => {
+    sessionStorage.setItem("infinai_chatbot_id", chatbot_id);
+
+    getConfig({ params: { ":chatbot_id": chatbot_id } })
+      .then(async ({ data }) => {
         if (data.success) {
-          setTopics(data.data);
-          // setInitMessages(
-          //   generateMessages({
-          //     topics,
-          //   })
-          // );
-          // setInitMessages((prev) =>
-          //   prev.map((item) =>
-          //     item._id === "topicQuery" ? { ...item, options: data.data } : item
-          //   )
-          // );
-          return data.data;
-        } else {
-          return null;
-          // alert(data.message);
+          setChatbotConfig(data.data);
+          if (data.data.primaryColor) {
+            const rgb = hexToRgba(data.data.primaryColor);
+            if (rgb.length >= 3) {
+              document
+                .querySelector(":root")
+                .style.setProperty("--primary-color", rgb.join(", "));
+            }
+          }
+          let topics = await getTopics().then(({ data }) => {
+            if (data.success) {
+              setTopics(data.data);
+              return data.data;
+            } else {
+              return null;
+            }
+          });
+          return {
+            topics,
+            config: data.data,
+          };
         }
       })
-      .then((topics) => {
-        const chatId = localStorage.getItem("comify_chat_id");
+      .then(({ config, topics }) => {
+        const chatId = localStorage.getItem("infinai_chat_id");
         if (chatId) {
           getChat({
             params: {
@@ -232,35 +206,27 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
                   generateMessages({
                     chatStartedAt: new Date(data.data.createdAt),
                     topics,
-                    topic: data.data.topic,
-                    // url: data.data.url,
-                    // name: data.data.user.name,
-                    // email: data.data.user.email,
-                    askQuery: true,
+                    ...(topics.includes(data.data.topic) && {
+                      topic: data.data.topic,
+                      askQuery: true,
+                    }),
                   })
                 );
               } else {
                 setConvo({
-                  topic: defaultUrl,
-                  name: localStorage.getItem("comify_chat_user_name"),
-                  email: localStorage.getItem("comify_chat_user_email"),
+                  name: localStorage.getItem("infinai_chat_user_name"),
+                  email: localStorage.getItem("infinai_chat_user_email"),
                 });
               }
             })
             .catch((err) => console.log(err));
         } else {
           setConvo({
-            topic: !topics?.length ? defaultUrl : null,
             topics,
-            name: localStorage.getItem("comify_chat_user_name"),
-            email: localStorage.getItem("comify_chat_user_email"),
+            name: localStorage.getItem("infinai_chat_user_name"),
+            email: localStorage.getItem("infinai_chat_user_email"),
           });
-          setInitMessages(
-            generateMessages({
-              topics,
-              // topic: !topics?.length ? defaultUrl : null,
-            })
-          );
+          setInitMessages(generateMessages({ topics }));
         }
       })
       .catch((err) => {
@@ -270,13 +236,13 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
         }
       });
 
-    const name = localStorage.getItem("comify_chat_user_name");
-    const email = localStorage.getItem("comify_chat_user_email");
+    const name = localStorage.getItem("infinai_chat_user_name");
+    const email = localStorage.getItem("infinai_chat_user_email");
     if (name && email) {
       setUser({ name, email });
     }
 
-    msgChannel.current = new BroadcastChannel("comify-chat-message");
+    msgChannel.current = new BroadcastChannel("infinai-chat-message");
     const handleMessage = ({ data: { messages } }) => {
       setMessages(messages);
     };
@@ -305,9 +271,11 @@ export const ChatContextProvider = ({ children, endpoints, defaultUrl }) => {
         msgChannel: msgChannel.current,
         initMessages,
         setInitMessages,
+        chatbotConfig,
+        setChatbotConfig,
       }}
     >
-      {botStatus === "active" ? children : null}
+      {chatbotConfig && botStatus === "active" ? children : null}
     </ChatContext.Provider>
   );
 };

@@ -16,15 +16,35 @@ import {
   generateMessages,
 } from "./context.js";
 import { Toast } from "./toast.js";
-import Icon from "./icons.js";
+import {
+  Check,
+  Clear,
+  Expand,
+  ThumbsDown,
+  ThumbsDownOutline,
+  ThumbsUp,
+  ThumbsUpOutline,
+  Contract,
+  Close,
+  Home,
+  Clipboard,
+  Send,
+} from "./icons.js";
 import { Moment } from "./moment";
 
-export default function ComifyChat({
+export default function InfinAIChat({
   baseUrl = "https://comify.in",
   defaultUrl = window.location.hostname,
   openAtStart,
+  chatbotId,
 } = {}) {
-  const containerId = "comifyChat_container";
+  if (!chatbotId) {
+    return console.error(
+      "chatbotId has not been provided. Please provide chatbotId"
+    );
+  }
+
+  const containerId = "infinaiChat_container";
 
   const container = document.createElement("div");
   container.id = containerId;
@@ -33,6 +53,7 @@ export default function ComifyChat({
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
       <ChatContextProvider
+        chatbot_id={chatbotId}
         endpoints={getEndpoints(baseUrl)}
         defaultUrl={defaultUrl?.replace(/https?:\/\/(www\.)?/, "")}
       >
@@ -45,14 +66,14 @@ export default function ComifyChat({
   );
 }
 
-export function ChatContainer({ openAtStart, defaultUrl }) {
+export function ChatContainer({ openAtStart }) {
   const [fullScreen, setFullScreen] = useState(false);
   const { setUser, toasts } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
 
   return (
     <div className={s.chatContainer}>
-      <div id="comifyChatTostContainer" className={s.toastContainer}>
+      <div id="infinaiChatTostContainer" className={s.toastContainer}>
         {toasts.map((item) => (
           <Toast
             key={item.id}
@@ -64,7 +85,6 @@ export function ChatContainer({ openAtStart, defaultUrl }) {
       </div>
       {open ? (
         <Chat
-          defaultUrl={defaultUrl}
           setOpen={setOpen}
           setUser={setUser}
           fullScreen={fullScreen}
@@ -72,9 +92,6 @@ export function ChatContainer({ openAtStart, defaultUrl }) {
         />
       ) : (
         <Avatar onClick={() => setOpen(true)} />
-        // <button className={s.chatTglBtn} onClick={() => setOpen(true)}>
-        //   <Icon name="message" />
-        // </button>
       )}
     </div>
   );
@@ -82,9 +99,10 @@ export function ChatContainer({ openAtStart, defaultUrl }) {
 
 const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
 
-const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
+const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   const chatRef = useRef();
   const {
+    chatbotConfig,
     unmountChat,
     user,
     setUser,
@@ -137,26 +155,33 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
     endpoints.chat
   );
   const initChat = useCallback(
-    (msg, userDetail = {}) => {
-      sendMessage(
-        {
-          ...(convo?.topic &&
-            convo.topic !== defaultUrl && { topic: convo.topic }),
-          ...(convo?.topic === defaultUrl && { url: "https://" + defaultUrl }),
-          name: convo.name,
-          email: convo.email,
-          ...userDetail,
-          message: msg,
-        },
-        { params: { ":chat_id": "" } }
-      )
+    (msg, userDetail = {}, { reloadInit } = {}) => {
+      let payload = {
+        name: convo.name,
+        email: convo.email,
+        ...userDetail,
+        message: msg,
+        topic: convo.topic,
+      };
+      sendMessage(payload, { params: { ":chat_id": "" } })
         .then(({ data }) => {
           if (!data.success) {
             return pushToast.error(data.message);
           }
-          localStorage.setItem("comify_chat_id", data.data._id);
-          localStorage.setItem("comify_chat_user_name", data.data.user.name);
-          localStorage.setItem("comify_chat_user_email", data.data.user.email);
+          localStorage.setItem("infinai_chat_id", data.data._id);
+          localStorage.setItem("infinai_chat_user_name", data.data.user.name);
+          localStorage.setItem("infinai_chat_user_email", data.data.user.email);
+          if (reloadInit) {
+            setInitMessages(
+              generateMessages({
+                topics,
+                ...(topics.includes(data.data.topic) && {
+                  topic: data.data.topic,
+                  askQuery: true,
+                }),
+              })
+            );
+          }
           setConvo({ ...data.data, messages: undefined });
           msgChannel.postMessage({ messages: data.data.messages.reverse() });
           setMessages(data.data.messages);
@@ -169,14 +194,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
           }
         });
     },
-    [convo]
+    [convo, chatbotConfig]
   );
-
-  useEffect(() => {
-    if (!topics?.length && convo?.topic === defaultUrl) {
-      setCurrInput("query");
-    }
-  }, [topics, convo?.topic]);
 
   return (
     <div
@@ -191,18 +210,22 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
               onClick={() => {
                 setUser(convo.user);
                 setConvo(null);
+                setCurrInput("query");
                 msgChannel.postMessage({ messages: [] });
                 setInitMessages(generateMessages({ topics }));
                 setMessages([]);
-                localStorage.setItem("comify_chat_user_name", convo.user.name);
                 localStorage.setItem(
-                  "comify_chat_user_email",
-                  convo.user.email
+                  "infinai_chat_user_name",
+                  convo.user?.name
                 );
-                localStorage.removeItem("comify_chat_id");
+                localStorage.setItem(
+                  "infinai_chat_user_email",
+                  convo.user?.email
+                );
+                localStorage.removeItem("infinai_chat_id");
               }}
             >
-              <Icon name="clear" />
+              <Clear />
             </button>
             <span title={convo.topic} className={s.title}>
               {convo.topic}
@@ -216,7 +239,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
               messagesRef.current.scrollTop = -messagesRef.current.scrollHeight;
             }}
           >
-            <Icon name="home" />
+            <Home />
           </button>
           {window.innerWidth >= 480 && (
             <button
@@ -242,10 +265,11 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
                 setFullScreen(!fullScreen);
               }}
             >
-              <Icon
-                className={s.fullScreen}
-                name={fullScreen ? "contract" : "expand"}
-              />
+              {fullScreen ? (
+                <Contract className={s.fullScreen} />
+              ) : (
+                <Expand className={s.fullScreen} />
+              )}
             </button>
           )}
           <button
@@ -264,7 +288,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
               }
             }}
           >
-            <Icon name="close" />
+            <Close />
           </button>
         </div>
       </div>
@@ -277,21 +301,31 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
                 <MessageForm
                   msg={item}
                   onSubmit={(values) => {
-                    console.log("setting user detail", values);
                     setConvo((prev) => ({
                       ...prev,
                       name: values.name,
                       email: values.email,
                     }));
-                    if (!topics?.length && convo.topic === defaultUrl) {
-                      const query = initMessages.find(
-                        (item) => item._id === "queryResponse"
-                      )?.content;
-                      setInitMessages(generateMessages({}));
-                      initChat(query, {
-                        name: values.name,
-                        email: values.email,
-                      });
+                    const query = initMessages.find(
+                      (item) => item._id === "queryResponse"
+                    )?.content;
+                    if (query) {
+                      setCurrInput("");
+                      setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: convo.topic,
+                          queryResponse: query,
+                        })
+                      );
+                      initChat(
+                        query,
+                        {
+                          name: values.name,
+                          email: values.email,
+                        },
+                        { reloadInit: true }
+                      );
                     } else {
                       setCurrInput("query");
                       return setInitMessages(
@@ -307,10 +341,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
               )}
               {item.type === "suggestion" && (
                 <Suggestions
-                  options={[
-                    ...item.options,
-                    ...(defaultUrl ? [defaultUrl] : []),
-                  ]}
+                  options={[...item.options]}
                   active={convo?.topic}
                   onChange={async (input) => {
                     await wait(200);
@@ -326,6 +357,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
                     });
 
                     if (!name || !email) {
+                      setCurrInput("userDetail");
                       return setInitMessages(
                         generateMessages({
                           topics,
@@ -338,23 +370,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
                     setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
 
                     if (!convo?._id) {
-                      if (input === "URL") {
-                        setInitMessages(
-                          generateMessages({
-                            topics,
-                            topic: input,
-                            ...(name ? { name } : { askName: true }),
-                            ...(email ? { email } : { askEmail: !!name }),
-                            ...(name && email ? { askUrl: true } : {}),
-                          })
-                        );
-                        if (!name) {
-                          setCurrInput("name");
-                        } else if (!email) {
-                          setCurrInput("email");
-                        } else if (name && email) {
-                          setCurrInput("url");
-                        }
+                      if (!name || !email) {
+                        setCurrInput("userDetail");
                         return;
                       }
                       setInitMessages(
@@ -366,43 +383,21 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
                           ...(name && email ? { askQuery: true } : {}),
                         })
                       );
-                      if (!name) {
-                        setCurrInput("name");
-                      } else if (!email) {
-                        setCurrInput("email");
-                      } else if (name && email) {
-                        setCurrInput("query");
-                      }
                     } else {
-                      if (input === "URL") {
-                        setInitMessages(
-                          generateMessages({
-                            topics,
-                            topic: input,
-                            name,
-                            email,
-                            askUrl: true,
-                          })
-                        );
-                        if (name && email) {
-                          setCurrInput("url");
-                        }
-                      } else {
-                        setInitMessages(
-                          generateMessages({
-                            topics,
-                            topic: input,
-                            input,
-                            name,
-                            email,
-                            askQuery: true,
-                          })
-                        );
-                        setCurrInput("query");
-                      }
+                      setInitMessages(
+                        generateMessages({
+                          topics,
+                          topic: input,
+                          input,
+                          name,
+                          email,
+                          askQuery: true,
+                        })
+                      );
+                      setCurrInput("query");
 
                       setMessages([]);
-                      localStorage.removeItem("comify_chat_id");
+                      localStorage.removeItem("infinai_chat_id");
                       messagesRef.current.scrollTop = 0;
                     }
                   }}
@@ -442,99 +437,30 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
         )}
       </div>
 
-      {false && !convo?._id && [""].includes(currInput) && (
-        <ChatForm
-          setOpen={setOpen}
-          inputOptions={{
-            type: currInput === "email" ? "email" : "text",
-            readOnly: !(convo?.topic || convo?.url),
-          }}
-          onSubmit={async (values, options) => {
-            await wait(200);
-            if (currInput === "url") {
-              const name = convo?.name;
-              const email = convo?.email;
-              setInitMessages(
-                generateMessages({
-                  topics,
-                  topic: convo.topic,
-                  url: values.msg.startsWith("http")
-                    ? values.msg
-                    : "http://" + values.msg,
-                  ...(name ? { name } : { askName: true }),
-                  ...(email ? { email } : { askEmail: !!name }),
-                  ...(name && email ? { askQuery: true } : {}),
-                })
-              );
-              setConvo((prev) => ({
-                ...prev,
-                url: values.msg.startsWith("http")
-                  ? values.msg
-                  : "http://" + values.msg,
-              }));
-              options.clearForm();
-              if (convo?.name && convo.email) {
-                setCurrInput("query");
-              }
-            } else if (currInput === "name") {
-              setInitMessages(
-                generateMessages({
-                  topics,
-                  topic: convo.topic,
-                  name: values.msg,
-                  askEmail: true,
-                })
-              );
-              setConvo((prev) => ({ ...prev, name: values.msg }));
-              if (!convo?.email) {
-                setCurrInput("email");
-              }
-            } else if (currInput === "email") {
-              setInitMessages(
-                generateMessages({
-                  topics,
-                  topic: convo.topic,
-                  name: convo.name,
-                  email: values.msg,
-                  ...(convo.topic === "URL"
-                    ? { askUrl: true }
-                    : { askQuery: true }),
-                })
-              );
-              setConvo((prev) => ({ ...prev, email: values.msg }));
-              if (convo?.topic === "URL") {
-                setCurrInput("url");
-              } else {
-                setCurrInput("query");
-              }
-            }
-            options.clearForm();
-            setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
-          }}
-          scrollDown={() => {
-            messagesRef.current.scrollTop = 0;
-          }}
-        />
-      )}
-
-      {!convo?._id && currInput === "query" && (
+      {!convo?._id && currInput !== "userDetail" && (
         <ChatForm
           onSubmit={(values, options) => {
-            if (
-              !topics?.length &&
-              convo?.topic === defaultUrl &&
-              (!convo.name || !convo.email)
-            ) {
+            const name =
+              convo?.name ||
+              user?.name ||
+              localStorage.getItem("infinai_chat_user_name");
+            const email =
+              convo?.email ||
+              user?.email ||
+              localStorage.getItem("infinai_chat_user_email");
+
+            if (!name || !email) {
               setInitMessages(
                 generateMessages({
                   queryResponse: values.msg,
                   askUserDetail: true,
                 })
               );
-              setCurrInput("");
+              setCurrInput("userDetail");
               return;
             }
-            initChat(values.msg);
+            initChat(values.msg, { name, email });
+            setCurrInput("query");
           }}
           scrollDown={() => {
             messagesRef.current.scrollTop = 0;
@@ -550,6 +476,12 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, defaultUrl }) => {
           }}
         />
       )}
+      <div className={s.footer}>
+        Powered by:{" "}
+        <a href="https://infinai.in" target="_blank">
+          Infin AI
+        </a>
+      </div>
     </div>
   );
 };
@@ -559,19 +491,19 @@ const Avatar = ({ onClick }) => {
   return (
     <div className={s.avatar} onClick={onClick}>
       {/* <img
-        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/circle.webp"}
+        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/circle.webp"}
       /> */}
       <div className={s.circle} />
       <img
         className={s.hand}
-        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/hand.webp"}
+        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/hand.webp"}
       />
       <img
-        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/body.webp"}
+        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/body.webp"}
       />
       <img
         className={s.head}
-        src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/head.webp"}
+        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/head.webp"}
       />
     </div>
   );
@@ -586,7 +518,9 @@ const Message = ({ msg, castVote, loading, style }) => {
         <div className={`${s.msgAvatar} ${s.assistant}`}>
           <img
             className={s.hand}
-            src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/full.webp"}
+            src={
+              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/full.webp"
+            }
           />
           <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
@@ -602,7 +536,7 @@ const Message = ({ msg, castVote, loading, style }) => {
               disabled={loading}
               onClick={() => castVote(msg._id, msg.like ? null : true)}
             >
-              <Icon name={msg.like ? "thumbs-up" : "thumbs-up-outlined"} />
+              {msg.like === true ? <ThumbsUp /> : <ThumbsUpOutline />}
             </button>
             <button
               className={s.btn}
@@ -612,18 +546,14 @@ const Message = ({ msg, castVote, loading, style }) => {
                 castVote(msg._id, msg.like === false ? null : false)
               }
             >
-              <Icon
-                name={
-                  msg.like === false ? "thumbs-down" : "thumbs-down-outlined"
-                }
-              />
+              {msg.like === false ? <ThumbsDown /> : <ThumbsDownOutline />}
             </button>
           </div>
         )}
       </div>
       {msg.role === "user" && (
         <div className={s.msgAvatar}>
-          <div className={s.img}>{user?.name?.[0] || "U"}</div>
+          <div className={s.img}>{user?.name?.[0]?.toUpperCase() || "U"}</div>
           <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
       )}
@@ -641,7 +571,9 @@ const MessageForm = ({ msg, style, onSubmit }) => {
         <div className={`${s.msgAvatar} ${s.assistant}`}>
           <img
             className={s.hand}
-            src={endpoints.baseUrl + "/assets/sdk/comify-chat-avatar/full.webp"}
+            src={
+              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/full.webp"
+            }
           />
           <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
@@ -716,10 +648,7 @@ const CopyBtn = ({ content }) => {
         }, 1000);
       }}
     >
-      <Icon
-        className={!done ? s.clipboard : ""}
-        name={done ? "check" : "clipboard"}
-      />
+      {done ? <Check /> : <Clipboard className={s.clipboard} />}
     </button>
   );
 };
@@ -812,7 +741,7 @@ const ChatForm = ({
             <span className={s.dot} />
           </>
         ) : (
-          <Icon name="send" />
+          <Send />
         )}
       </button>
     </form>

@@ -32,6 +32,7 @@ export const useFetch = (url) => {
         fetch(_url, {
           method,
           headers: {
+            "x-chatbot-id": sessionStorage.getItem("infinai_chatbot_id"),
             ...(!(typeof payload?.append === "function") && {
               "Content-Type": "application/json",
             }),

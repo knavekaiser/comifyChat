@@ -4,8 +4,8 @@ module.exports = {
   entry: "./src/components/comifyChat/index.jsx", // Entry point of the SDK
   output: {
     path: path.resolve(__dirname, "dist"), // Output directory
-    filename: "comify-chat-sdk-v0.9.0.js", // Output filename
-    library: "ComifyChat",
+    filename: "infinai-chat-sdk-v0.9.0.js", // Output filename
+    library: "InfinAI",
     libraryTarget: "umd",
     umdNamedDefine: true,
   },

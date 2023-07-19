@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import s from "./style.module.scss";
 import { ChatContext } from "./context.js";
-import Icon from "./icons.js";
+import { Close } from "./icons.js";
 
 export const Toast = ({ id, type, message }) => {
   const { setToasts } = useContext(ChatContext);
@@ -15,7 +15,7 @@ export const Toast = ({ id, type, message }) => {
           delete window[`comify_toast_timeout_${id}`];
         }}
       >
-        <Icon name="close" />
+        <Close />
       </button>
     </div>
   );
