@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-export const useFetch = (url) => {
+export const useFetch = (url, hookHeaders) => {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const controller = useRef();
@@ -32,10 +32,10 @@ export const useFetch = (url) => {
         fetch(_url, {
           method,
           headers: {
-            "x-chatbot-id": sessionStorage.getItem("infinai_chatbot_id"),
             ...(!(typeof payload?.append === "function") && {
               "Content-Type": "application/json",
             }),
+            ...hookHeaders,
             ...headers,
           },
           ...(["POST", "PUT", "PATCH", "DELETE"].includes(method) && {

@@ -21,6 +21,7 @@ function App() {
         </a>
       </div>
       <h1>Vite + React</h1>
+      <div id="chatContainer" />
       <div className="card">
         <button onClick={() => setCount((count) => count + 1)}>
           count is {count}
@@ -35,9 +36,8 @@ function App() {
       <ChatContextProvider
         chatbot_id={"64ad0fab0efb0096d63baf15"}
         endpoints={getEndpoints()}
-        defaultUrl={window.location.hostname}
       >
-        <ComifyChat openAtStart defaultUrl={window.location.hostname} />
+        <ComifyChat openAtStart={false} standalone />
       </ChatContextProvider>
     </>
   );

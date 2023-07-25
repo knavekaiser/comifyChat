@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import s from "./style.module.scss";
-import { ChatContext } from "./context.js";
-import { Close } from "./icons.js";
+import { ChatContext } from "./context.jsx";
+import { Close } from "./icons.jsx";
 
 export const Toast = ({ id, type, message }) => {
   const { setToasts } = useContext(ChatContext);

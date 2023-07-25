@@ -14,8 +14,8 @@ import {
   ChatContextProvider,
   ChatContext,
   generateMessages,
-} from "./context.js";
-import { Toast } from "./toast.js";
+} from "./context.jsx";
+import { Toast } from "./toast.jsx";
 import {
   Check,
   Clear,
@@ -29,14 +29,19 @@ import {
   Home,
   Clipboard,
   Send,
-} from "./icons.js";
-import { Moment } from "./moment";
+} from "./icons.jsx";
+import { Moment } from "./moment.jsx";
+import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
 export default function InfinAIChat({
   baseUrl = "https://comify.in",
-  defaultUrl = window.location.hostname,
   openAtStart,
   chatbotId,
+  standalone,
+  containerId,
+  whitlistedPaths,
+  blacklistedPaths,
+  paths,
 } = {}) {
   if (!chatbotId) {
     return console.error(
@@ -44,35 +49,66 @@ export default function InfinAIChat({
     );
   }
 
-  const containerId = "infinaiChat_container";
+  let container = null;
+  if (containerId) {
+    container = document.getElementById(containerId);
+    if (!container) {
+      console.error("Plase provide id of a div that exist.");
+      return;
+    }
+  } else {
+    containerId = "infinaiChat_container";
+    container = document.createElement("div");
+    container.id = containerId;
+    document.body.appendChild(container);
+  }
 
-  const container = document.createElement("div");
-  container.id = containerId;
-  document.body.appendChild(container);
+  const app = (
+    <ChatContextProvider
+      chatbot_id={chatbotId}
+      endpoints={getEndpoints(baseUrl)}
+      containerId={containerId}
+      blacklistedPaths={blacklistedPaths}
+      whitlistedPaths={whitlistedPaths}
+    >
+      <ChatContainer standalone={standalone} openAtStart={openAtStart} />
+    </ChatContextProvider>
+  );
+
+  const router = createBrowserRouter(
+    paths
+      ? [
+          ...paths?.map((path) => ({
+            path,
+            element: app,
+          })),
+          {
+            path: "/*",
+            element: <></>,
+          },
+        ]
+      : [
+          {
+            path: "/*",
+            element: app,
+          },
+        ]
+  );
 
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
-      <ChatContextProvider
-        chatbot_id={chatbotId}
-        endpoints={getEndpoints(baseUrl)}
-        defaultUrl={defaultUrl?.replace(/https?:\/\/(www\.)?/, "")}
-      >
-        <ChatContainer
-          openAtStart={openAtStart}
-          defaultUrl={defaultUrl?.replace(/https?:\/\/(www\.)?/, "")}
-        />
-      </ChatContextProvider>
+      <RouterProvider router={router} />
     </React.StrictMode>
   );
 }
 
-export function ChatContainer({ openAtStart }) {
+export function ChatContainer({ openAtStart, standalone }) {
   const [fullScreen, setFullScreen] = useState(false);
-  const { setUser, toasts } = useContext(ChatContext);
+  const { chatbotConfig, setUser, toasts } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
 
   return (
-    <div className={s.chatContainer}>
+    <div className={`${s.chatContainer} ${standalone ? s.standalone : ""}`}>
       <div id="infinaiChatTostContainer" className={s.toastContainer}>
         {toasts.map((item) => (
           <Toast
@@ -83,15 +119,16 @@ export function ChatContainer({ openAtStart }) {
           />
         ))}
       </div>
-      {open ? (
+      {open || standalone ? (
         <Chat
+          standalone={standalone}
           setOpen={setOpen}
           setUser={setUser}
           fullScreen={fullScreen}
           setFullScreen={setFullScreen}
         />
       ) : (
-        <Avatar onClick={() => setOpen(true)} />
+        <Avatar onClick={() => setOpen(true)} src={chatbotConfig?.avatar} />
       )}
     </div>
   );
@@ -99,9 +136,10 @@ export function ChatContainer({ openAtStart }) {
 
 const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
 
-const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
+const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
   const chatRef = useRef();
   const {
+    chatbot_id,
     chatbotConfig,
     unmountChat,
     user,
@@ -121,7 +159,9 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
 
   const messagesRef = useRef();
 
-  const { post: castVote, loading } = useFetch(endpoints.message);
+  const { post: castVote, loading } = useFetch(endpoints.message, {
+    "x-chatbot-id": chatbot_id,
+  });
   const vote = useCallback(
     (msg_id, vote) => {
       castVote(
@@ -152,13 +192,14 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   );
 
   const { post: sendMessage, loading: initiatingChat } = useFetch(
-    endpoints.chat
+    endpoints.chat,
+    { "x-chatbot-id": chatbot_id }
   );
   const initChat = useCallback(
     (msg, userDetail = {}, { reloadInit } = {}) => {
       let payload = {
-        name: convo.name,
-        email: convo.email,
+        name: convo?.name,
+        email: convo?.email,
         ...userDetail,
         message: msg,
         topic: convo.topic,
@@ -203,36 +244,42 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
       ref={chatRef}
     >
       <div className={s.header}>
-        {convo?.topic && (
-          <div className={s.left}>
-            <button
-              className={s.clearBtn}
-              onClick={() => {
-                setUser(convo.user);
-                setConvo(null);
-                setCurrInput("query");
-                msgChannel.postMessage({ messages: [] });
-                setInitMessages(generateMessages({ topics }));
-                setMessages([]);
-                localStorage.setItem(
-                  "infinai_chat_user_name",
-                  convo.user?.name
-                );
-                localStorage.setItem(
-                  "infinai_chat_user_email",
-                  convo.user?.email
-                );
-                localStorage.removeItem("infinai_chat_id");
-              }}
-            >
-              <Clear />
-            </button>
-            <span title={convo.topic} className={s.title}>
-              {convo.topic}
-            </span>
+        <div className={s.left}>
+          <div className={s.companyDetail}>
+            {chatbotConfig?.avatar && (
+              <img src={endpoints.baseUrl + chatbotConfig.avatar} />
+            )}
+            <p>{chatbotConfig?.display_name || "Infin AI"}</p>
           </div>
-        )}
+          {convo?.topic && (
+            <>
+              <span>•</span>
+              <span title={convo.topic} className={s.title}>
+                {convo.topic}
+              </span>
+            </>
+          )}
+        </div>
         <div className={s.right}>
+          <button
+            className={s.clearBtn}
+            onClick={() => {
+              setUser(convo.user);
+              setConvo(null);
+              setCurrInput("query");
+              msgChannel.postMessage({ messages: [] });
+              setInitMessages(generateMessages({ topics }));
+              setMessages([]);
+              localStorage.setItem("infinai_chat_user_name", convo.user?.name);
+              localStorage.setItem(
+                "infinai_chat_user_email",
+                convo.user?.email
+              );
+              localStorage.removeItem("infinai_chat_id");
+            }}
+          >
+            <Clear />
+          </button>
           <button
             className={s.home}
             onClick={() => {
@@ -272,24 +319,26 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
               )}
             </button>
           )}
-          <button
-            className={s.closeBtn}
-            onClick={() => {
-              setOpen(false);
-              if (fullScreen) {
-                if (document.exitFullscreen) {
-                  document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                  document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
-                  document.msExitFullscreen();
+          {!standalone && (
+            <button
+              className={s.closeBtn}
+              onClick={() => {
+                setOpen(false);
+                if (fullScreen) {
+                  if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                  } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                  } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                  }
+                  setFullScreen(false);
                 }
-                setFullScreen(false);
-              }
-            }}
-          >
-            <Close />
-          </button>
+              }}
+            >
+              <Close />
+            </button>
+          )}
         </div>
       </div>
 
@@ -486,40 +535,58 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   );
 };
 
-const Avatar = ({ onClick }) => {
+const Avatar = ({ onClick, src }) => {
   const { endpoints } = useContext(ChatContext);
   return (
-    <div className={s.avatar} onClick={onClick}>
-      {/* <img
+    <div className={`${s.avatar} ${src ? s.custom : ""}`} onClick={onClick}>
+      {src ? (
+        <img src={endpoints.baseUrl + src} />
+      ) : (
+        <>
+          {/* <img
         src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/circle.webp"}
       /> */}
-      <div className={s.circle} />
-      <img
-        className={s.hand}
-        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/hand.webp"}
-      />
-      <img
-        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/body.webp"}
-      />
-      <img
-        className={s.head}
-        src={endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/head.webp"}
-      />
+          <div className={s.circle} />
+          <img
+            className={s.hand}
+            src={
+              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/hand.webp"
+            }
+          />
+          <img
+            src={
+              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/body.webp"
+            }
+          />
+          <img
+            className={s.head}
+            src={
+              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/head.webp"
+            }
+          />
+        </>
+      )}
     </div>
   );
 };
 
 const Message = ({ msg, castVote, loading, style }) => {
-  const { user, endpoints } = useContext(ChatContext);
+  const { chatbotConfig, user, endpoints } = useContext(ChatContext);
 
   return (
     <div className={`${s.msg} ${s[msg.role]}`} style={style}>
       {msg.role !== "user" && (
-        <div className={`${s.msgAvatar} ${s.assistant}`}>
+        <div
+          className={`${s.msgAvatar} ${s.assistant} ${
+            chatbotConfig?.avatar ? s.custom : ""
+          }`}
+        >
           <img
             className={s.hand}
             src={
-              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/full.webp"
+              endpoints.baseUrl +
+              (chatbotConfig?.avatar ||
+                "/assets/sdk/infinai-chat-avatar/full.webp")
             }
           />
           <Moment format="hh:mm">{msg.createdAt}</Moment>
@@ -563,16 +630,22 @@ const Message = ({ msg, castVote, loading, style }) => {
 
 const MessageForm = ({ msg, style, onSubmit }) => {
   const [values, setValues] = useState({});
-  const { endpoints } = useContext(ChatContext);
+  const { chatbotConfig, endpoints } = useContext(ChatContext);
 
   return (
     <div className={`${s.msg} ${s.form}`} style={style}>
       {msg.role !== "user" && (
-        <div className={`${s.msgAvatar} ${s.assistant}`}>
+        <div
+          className={`${s.msgAvatar} ${s.assistant} ${
+            chatbotConfig?.avatar ? s.custom : ""
+          }`}
+        >
           <img
             className={s.hand}
             src={
-              endpoints.baseUrl + "/assets/sdk/infinai-chat-avatar/full.webp"
+              endpoints.baseUrl +
+              (chatbotConfig?.avatar ||
+                "/assets/sdk/infinai-chat-avatar/full.webp")
             }
           />
           <Moment format="hh:mm">{msg.createdAt}</Moment>
@@ -660,10 +733,12 @@ const ChatForm = ({
   onSubmit,
   loading: defaultLoading,
 }) => {
-  const { endpoints, convo, setMessages, msgChannel, pushToast } =
+  const { chatbot_id, endpoints, convo, setMessages, msgChannel, pushToast } =
     useContext(ChatContext);
   const [msg, setMsg] = useState("");
-  const { post: sendMessage, loading } = useFetch(endpoints.chat);
+  const { post: sendMessage, loading } = useFetch(endpoints.chat, {
+    "x-chatbot-id": chatbot_id,
+  });
   const submit = useCallback(
     (e) => {
       e.preventDefault();

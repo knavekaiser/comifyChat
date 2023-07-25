@@ -5,6 +5,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import { useLocation } from "react-router-dom";
 import useFetch from "./utils/useFetch.js";
 
 export const ChatContext = createContext();
@@ -56,7 +57,7 @@ export const generateMessages = ({
       _id: "askUserDetail",
       role: "system",
       type: "form",
-      content: "We just need some more infomration from you to proceed:",
+      content: "We just need some information from you to proceed:",
       createdAt: chatStartedAt,
       fields: [
         {
@@ -110,7 +111,14 @@ function hexToRgba(hex) {
   return [r, g, b];
 }
 
-export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
+export const ChatContextProvider = ({
+  chatbot_id,
+  children,
+  endpoints,
+  containerId,
+  blacklistedPaths,
+  whitelistedPaths,
+}) => {
   const msgChannel = useRef();
   const [chatbotConfig, setChatbotConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
@@ -123,9 +131,15 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
   );
   const [botStatus, setBotStatus] = useState("active");
 
-  const { get: getTopics } = useFetch(endpoints.topics);
-  const { get: getChat } = useFetch(endpoints.chat);
-  const { get: getConfig } = useFetch(endpoints.chatbotConfig);
+  const { get: getTopics } = useFetch(endpoints.topics, {
+    "x-chatbot-id": chatbot_id,
+  });
+  const { get: getChat } = useFetch(endpoints.chat, {
+    "x-chatbot-id": chatbot_id,
+  });
+  const { get: getConfig } = useFetch(endpoints.chatbotConfig, {
+    "x-chatbot-id": chatbot_id,
+  });
 
   const _pushToast = useCallback((type, message) => {
     const id = Math.random().toString(36).substring(2);
@@ -138,9 +152,9 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
       ...prev,
     ]);
 
-    window[`infinai_toast_timeout_${id}`] = setTimeout(() => {
+    window[`infinai_toast_timeout_${chatbot_id}_${id}`] = setTimeout(() => {
       setToasts((prev) => prev.filter((item) => item.id !== id));
-      delete window[`infinai_toast_timeout_${id}`];
+      delete window[`infinai_toast_timeout_${chatbot_id}_${id}`];
     }, 3000);
   }, []);
   const pushToast = {
@@ -150,7 +164,7 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
 
   const unmountChat = useCallback(() => {
     setTimeout(() => {
-      const container = document.querySelector("#infinaiChat_container");
+      const container = document.getElementById(containerId);
       setBotStatus("inactive");
       if (container) {
         container.remove();
@@ -161,8 +175,6 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
   useEffect(() => {
     window.addEventListener("resize", () => resizeWindow());
     resizeWindow();
-
-    sessionStorage.setItem("infinai_chatbot_id", chatbot_id);
 
     getConfig({ params: { ":chatbot_id": chatbot_id } })
       .then(async ({ data }) => {
@@ -242,7 +254,9 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
       setUser({ name, email });
     }
 
-    msgChannel.current = new BroadcastChannel("infinai-chat-message");
+    msgChannel.current = new BroadcastChannel(
+      `infinai-chat-message-${chatbot_id}`
+    );
     const handleMessage = ({ data: { messages } }) => {
       setMessages(messages);
     };
@@ -252,6 +266,8 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
       msgChannel.current.removeEventListener("message", handleMessage);
     };
   }, []);
+
+  const location = useLocation();
 
   return (
     <ChatContext.Provider
@@ -275,7 +291,16 @@ export const ChatContextProvider = ({ chatbot_id, children, endpoints }) => {
         setChatbotConfig,
       }}
     >
-      {chatbotConfig && botStatus === "active" ? children : null}
+      {(whitelistedPaths
+        ? whitelistedPaths.includes(location.pathname)
+        : true) &&
+      (blacklistedPaths
+        ? !blacklistedPaths.includes(location.pathname)
+        : true) &&
+      chatbotConfig &&
+      botStatus === "active"
+        ? children
+        : null}
     </ChatContext.Provider>
   );
 };
