@@ -125,6 +125,8 @@
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
+          font-size: 0.8em;
+          font-style: italic;
         }
       }
       .right {
@@ -574,5 +576,17 @@ button {
         }
       }
     }
+  }
+}
+
+.ellepsis {
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 1;
+  &.line-2 {
+    -webkit-line-clamp: 2;
   }
 }

@@ -104,7 +104,7 @@ export default function InfinAIChat({
 
 export function ChatContainer({ openAtStart, standalone }) {
   const [fullScreen, setFullScreen] = useState(false);
-  const { chatbotConfig, setUser, toasts } = useContext(ChatContext);
+  const { chatbotConfig, toasts } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
 
   return (
@@ -123,7 +123,6 @@ export function ChatContainer({ openAtStart, standalone }) {
         <Chat
           standalone={standalone}
           setOpen={setOpen}
-          setUser={setUser}
           fullScreen={fullScreen}
           setFullScreen={setFullScreen}
         />
@@ -142,8 +141,6 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
     chatbot_id,
     chatbotConfig,
     unmountChat,
-    user,
-    setUser,
     endpoints,
     convo,
     setConvo,
@@ -198,8 +195,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
   const initChat = useCallback(
     (msg, userDetail = {}, { reloadInit } = {}) => {
       let payload = {
-        name: convo?.name,
-        email: convo?.email,
+        name: convo?.user?.name,
+        email: convo?.user?.email,
         ...userDetail,
         message: msg,
         topic: convo.topic,
@@ -216,7 +213,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
             setInitMessages(
               generateMessages({
                 topics,
-                ...(topics.includes(data.data.topic) && {
+                ...(topics.some((t) => t.topic === data.data.topic) && {
                   topic: data.data.topic,
                   askQuery: true,
                 }),
@@ -249,32 +246,46 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
             {chatbotConfig?.avatar && (
               <img src={endpoints.baseUrl + chatbotConfig.avatar} />
             )}
-            <p>{chatbotConfig?.display_name || "Infin AI"}</p>
+            <div>
+              <p className={s.ellepsis}>
+                {chatbotConfig?.display_name || "Infin AI"}
+              </p>
+              {convo?.topic && (
+                <>
+                  {/* <span>•</span> */}
+                  <span
+                    title={convo.topic}
+                    className={`${s.title} ${s.ellepsis}`}
+                  >
+                    {convo.topic}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-          {convo?.topic && (
-            <>
-              <span>•</span>
-              <span title={convo.topic} className={s.title}>
-                {convo.topic}
-              </span>
-            </>
-          )}
         </div>
         <div className={s.right}>
           <button
             className={s.clearBtn}
             onClick={() => {
-              setUser(convo.user);
-              setConvo(null);
+              setConvo((prev) => {
+                if (prev?.user?.name && prev?.user?.email) {
+                  localStorage.setItem(
+                    "infinai_chat_user_name",
+                    prev.user.name
+                  );
+                  localStorage.setItem(
+                    "infinai_chat_user_email",
+                    prev.user.email
+                  );
+                  return { user: prev.user };
+                }
+                return {};
+              });
               setCurrInput("query");
               msgChannel.postMessage({ messages: [] });
               setInitMessages(generateMessages({ topics }));
               setMessages([]);
-              localStorage.setItem("infinai_chat_user_name", convo.user?.name);
-              localStorage.setItem(
-                "infinai_chat_user_email",
-                convo.user?.email
-              );
               localStorage.removeItem("infinai_chat_id");
             }}
           >
@@ -352,8 +363,10 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
                   onSubmit={(values) => {
                     setConvo((prev) => ({
                       ...prev,
-                      name: values.name,
-                      email: values.email,
+                      user: {
+                        name: values.name,
+                        email: values.email,
+                      },
                     }));
                     const query = initMessages.find(
                       (item) => item._id === "queryResponse"
@@ -395,15 +408,13 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
                   onChange={async (input) => {
                     await wait(200);
 
-                    const name = convo?.user?.name || convo?.name || user?.name;
-                    const email =
-                      convo?.user?.email || convo?.email || user?.email;
+                    const name = convo?.user?.name;
+                    const email = convo?.user?.email;
 
-                    setConvo({
+                    setConvo((prev) => ({
                       topic: input,
-                      name,
-                      email,
-                    });
+                      user: prev?.user,
+                    }));
 
                     if (!name || !email) {
                       setCurrInput("userDetail");
@@ -490,12 +501,10 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
         <ChatForm
           onSubmit={(values, options) => {
             const name =
-              convo?.name ||
-              user?.name ||
+              convo?.user?.name ||
               localStorage.getItem("infinai_chat_user_name");
             const email =
-              convo?.email ||
-              user?.email ||
+              convo?.user?.email ||
               localStorage.getItem("infinai_chat_user_email");
 
             if (!name || !email) {
@@ -571,7 +580,7 @@ const Avatar = ({ onClick, src }) => {
 };
 
 const Message = ({ msg, castVote, loading, style }) => {
-  const { chatbotConfig, user, endpoints } = useContext(ChatContext);
+  const { chatbotConfig, convo, endpoints } = useContext(ChatContext);
 
   return (
     <div className={`${s.msg} ${s[msg.role]}`} style={style}>
@@ -620,7 +629,9 @@ const Message = ({ msg, castVote, loading, style }) => {
       </div>
       {msg.role === "user" && (
         <div className={s.msgAvatar}>
-          <div className={s.img}>{user?.name?.[0]?.toUpperCase() || "U"}</div>
+          <div className={s.img}>
+            {convo?.user?.name?.[0]?.toUpperCase() || "U"}
+          </div>
           <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
       )}

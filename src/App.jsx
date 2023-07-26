@@ -37,7 +37,7 @@ function App() {
         chatbot_id={"64ad0fab0efb0096d63baf15"}
         endpoints={getEndpoints()}
       >
-        <ComifyChat openAtStart={false} standalone />
+        <ComifyChat openAtStart={false} standalone={false} />
       </ChatContextProvider>
     </>
   );

@@ -32,7 +32,7 @@ export const generateMessages = ({
     messages.unshift({
       _id: "topicQuery",
       type: "suggestion",
-      options: topics,
+      options: topics.map((item) => item.topic),
       createdAt: chatStartedAt,
     });
   }
@@ -81,7 +81,9 @@ export const generateMessages = ({
     messages.unshift({
       _id: "queryQuery",
       role: "system",
-      content: "Please ask your question",
+      content:
+        topics?.find((t) => t.topic === topic)?.contextForUsers ||
+        "Please ask your question",
       createdAt: chatStartedAt,
     });
   }
@@ -122,7 +124,6 @@ export const ChatContextProvider = ({
   const msgChannel = useRef();
   const [chatbotConfig, setChatbotConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [user, setUser] = useState(null);
   const [convo, setConvo] = useState(null);
   const [topics, setTopics] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -179,27 +180,18 @@ export const ChatContextProvider = ({
     getConfig({ params: { ":chatbot_id": chatbot_id } })
       .then(async ({ data }) => {
         if (data.success) {
-          setChatbotConfig(data.data);
-          if (data.data.primaryColor) {
-            const rgb = hexToRgba(data.data.primaryColor);
+          const { topics, ...rest } = data.data;
+          setChatbotConfig(rest);
+          setTopics(topics);
+          if (rest.primaryColor) {
+            const rgb = hexToRgba(rest.primaryColor);
             if (rgb.length >= 3) {
               document
                 .querySelector(":root")
                 .style.setProperty("--primary-color", rgb.join(", "));
             }
           }
-          let topics = await getTopics().then(({ data }) => {
-            if (data.success) {
-              setTopics(data.data);
-              return data.data;
-            } else {
-              return null;
-            }
-          });
-          return {
-            topics,
-            config: data.data,
-          };
+          return { topics, config: rest };
         }
       })
       .then(({ config, topics }) => {
@@ -226,17 +218,20 @@ export const ChatContextProvider = ({
                 );
               } else {
                 setConvo({
-                  name: localStorage.getItem("infinai_chat_user_name"),
-                  email: localStorage.getItem("infinai_chat_user_email"),
+                  user: {
+                    name: localStorage.getItem("infinai_chat_user_name"),
+                    email: localStorage.getItem("infinai_chat_user_email"),
+                  },
                 });
               }
             })
             .catch((err) => console.log(err));
         } else {
           setConvo({
-            topics,
-            name: localStorage.getItem("infinai_chat_user_name"),
-            email: localStorage.getItem("infinai_chat_user_email"),
+            user: {
+              name: localStorage.getItem("infinai_chat_user_name"),
+              email: localStorage.getItem("infinai_chat_user_email"),
+            },
           });
           setInitMessages(generateMessages({ topics }));
         }
@@ -247,12 +242,6 @@ export const ChatContextProvider = ({
           unmountChat();
         }
       });
-
-    const name = localStorage.getItem("infinai_chat_user_name");
-    const email = localStorage.getItem("infinai_chat_user_email");
-    if (name && email) {
-      setUser({ name, email });
-    }
 
     msgChannel.current = new BroadcastChannel(
       `infinai-chat-message-${chatbot_id}`
@@ -272,8 +261,6 @@ export const ChatContextProvider = ({
   return (
     <ChatContext.Provider
       value={{
-        user,
-        setUser,
         topics,
         setTopics,
         convo,
@@ -289,6 +276,7 @@ export const ChatContextProvider = ({
         setInitMessages,
         chatbotConfig,
         setChatbotConfig,
+        chatbot_id,
       }}
     >
       {(whitelistedPaths
