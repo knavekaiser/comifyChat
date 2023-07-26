@@ -31,7 +31,6 @@ import {
   Send,
 } from "./icons.jsx";
 import { Moment } from "./moment.jsx";
-import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
 export default function InfinAIChat({
   baseUrl = "https://comify.in",
@@ -39,7 +38,6 @@ export default function InfinAIChat({
   chatbotId,
   standalone,
   containerId,
-  whitlistedPaths,
   blacklistedPaths,
   paths,
 } = {}) {
@@ -57,59 +55,53 @@ export default function InfinAIChat({
       return;
     }
   } else {
-    containerId = "infinaiChat_container";
+    containerId = `infinaiChat_container_${chatbotId}`;
     container = document.createElement("div");
     container.id = containerId;
     document.body.appendChild(container);
   }
 
-  const app = (
-    <ChatContextProvider
-      chatbot_id={chatbotId}
-      endpoints={getEndpoints(baseUrl)}
-      containerId={containerId}
-      blacklistedPaths={blacklistedPaths}
-      whitlistedPaths={whitlistedPaths}
-    >
-      <ChatContainer standalone={standalone} openAtStart={openAtStart} />
-    </ChatContextProvider>
-  );
-
-  const router = createBrowserRouter(
-    paths
-      ? [
-          ...paths?.map((path) => ({
-            path,
-            element: app,
-          })),
-          {
-            path: "/*",
-            element: <></>,
-          },
-        ]
-      : [
-          {
-            path: "/*",
-            element: app,
-          },
-        ]
-  );
-
   ReactDOM.createRoot(container).render(
     <React.StrictMode>
-      <RouterProvider router={router} />
+      <ChatContextProvider
+        chatbot_id={chatbotId}
+        endpoints={getEndpoints(baseUrl)}
+        containerId={containerId}
+        paths={paths}
+        blacklistedPaths={blacklistedPaths}
+        standalone={standalone}
+      >
+        <ChatContainer openAtStart={openAtStart} />
+      </ChatContextProvider>
     </React.StrictMode>
   );
 }
 
-export function ChatContainer({ openAtStart, standalone }) {
+export function ChatContainer({ openAtStart }) {
   const [fullScreen, setFullScreen] = useState(false);
-  const { chatbotConfig, setUser, toasts } = useContext(ChatContext);
+  const { chatbotConfig, toasts, standalone } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
 
+  useEffect(() => {
+    const handler = () => {
+      console.log("location changed", window.location.pathname);
+    };
+    window.addEventListener("locationchange", handler);
+    return () => {
+      window.removeEventListener("locationchange", handler);
+    };
+  }, []);
+
   return (
-    <div className={`${s.chatContainer} ${standalone ? s.standalone : ""}`}>
-      <div id="infinaiChatTostContainer" className={s.toastContainer}>
+    <div
+      className={`infinai_chat_container ${s.chatContainer} ${
+        standalone ? s.standalone : ""
+      }`}
+    >
+      <div
+        id="infinaiChatTostContainer"
+        className={`infinai_chat_toast_container ${s.toastContainer}`}
+      >
         {toasts.map((item) => (
           <Toast
             key={item.id}
@@ -121,9 +113,7 @@ export function ChatContainer({ openAtStart, standalone }) {
       </div>
       {open || standalone ? (
         <Chat
-          standalone={standalone}
           setOpen={setOpen}
-          setUser={setUser}
           fullScreen={fullScreen}
           setFullScreen={setFullScreen}
         />
@@ -136,14 +126,12 @@ export function ChatContainer({ openAtStart, standalone }) {
 
 const wait = (ms) => new Promise((res, rej) => setTimeout(() => res(true), ms));
 
-const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
+const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
   const chatRef = useRef();
   const {
     chatbot_id,
     chatbotConfig,
     unmountChat,
-    user,
-    setUser,
     endpoints,
     convo,
     setConvo,
@@ -154,6 +142,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
     initMessages,
     setInitMessages,
     topics,
+    standalone,
   } = useContext(ChatContext);
   const [currInput, setCurrInput] = useState("");
 
@@ -198,8 +187,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
   const initChat = useCallback(
     (msg, userDetail = {}, { reloadInit } = {}) => {
       let payload = {
-        name: convo?.name,
-        email: convo?.email,
+        name: convo?.user?.name,
+        email: convo?.user?.email,
         ...userDetail,
         message: msg,
         topic: convo.topic,
@@ -216,7 +205,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
             setInitMessages(
               generateMessages({
                 topics,
-                ...(topics.includes(data.data.topic) && {
+                ...(topics.some((t) => t.topic === data.data.topic) && {
                   topic: data.data.topic,
                   askQuery: true,
                 }),
@@ -240,7 +229,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
 
   return (
     <div
-      className={`${s.chat} ${fullScreen ? s.fullScreen : ""}`}
+      className={`infinai_chat ${s.chat} ${fullScreen ? s.fullScreen : ""}`}
       ref={chatRef}
     >
       <div className={s.header}>
@@ -249,32 +238,46 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
             {chatbotConfig?.avatar && (
               <img src={endpoints.baseUrl + chatbotConfig.avatar} />
             )}
-            <p>{chatbotConfig?.display_name || "Infin AI"}</p>
+            <div>
+              <p className={s.ellepsis}>
+                {chatbotConfig?.display_name || "Infin AI"}
+              </p>
+              {convo?.topic && (
+                <>
+                  {/* <span>•</span> */}
+                  <span
+                    title={convo.topic}
+                    className={`${s.title} ${s.ellepsis}`}
+                  >
+                    {convo.topic}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-          {convo?.topic && (
-            <>
-              <span>•</span>
-              <span title={convo.topic} className={s.title}>
-                {convo.topic}
-              </span>
-            </>
-          )}
         </div>
         <div className={s.right}>
           <button
             className={s.clearBtn}
             onClick={() => {
-              setUser(convo.user);
-              setConvo(null);
+              setConvo((prev) => {
+                if (prev?.user?.name && prev?.user?.email) {
+                  localStorage.setItem(
+                    "infinai_chat_user_name",
+                    prev.user.name
+                  );
+                  localStorage.setItem(
+                    "infinai_chat_user_email",
+                    prev.user.email
+                  );
+                  return { user: prev.user };
+                }
+                return {};
+              });
               setCurrInput("query");
               msgChannel.postMessage({ messages: [] });
               setInitMessages(generateMessages({ topics }));
               setMessages([]);
-              localStorage.setItem("infinai_chat_user_name", convo.user?.name);
-              localStorage.setItem(
-                "infinai_chat_user_email",
-                convo.user?.email
-              );
               localStorage.removeItem("infinai_chat_id");
             }}
           >
@@ -352,8 +355,10 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
                   onSubmit={(values) => {
                     setConvo((prev) => ({
                       ...prev,
-                      name: values.name,
-                      email: values.email,
+                      user: {
+                        name: values.name,
+                        email: values.email,
+                      },
                     }));
                     const query = initMessages.find(
                       (item) => item._id === "queryResponse"
@@ -395,15 +400,13 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
                   onChange={async (input) => {
                     await wait(200);
 
-                    const name = convo?.user?.name || convo?.name || user?.name;
-                    const email =
-                      convo?.user?.email || convo?.email || user?.email;
+                    const name = convo?.user?.name;
+                    const email = convo?.user?.email;
 
-                    setConvo({
+                    setConvo((prev) => ({
                       topic: input,
-                      name,
-                      email,
-                    });
+                      user: prev?.user,
+                    }));
 
                     if (!name || !email) {
                       setCurrInput("userDetail");
@@ -490,12 +493,10 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
         <ChatForm
           onSubmit={(values, options) => {
             const name =
-              convo?.name ||
-              user?.name ||
+              convo?.user?.name ||
               localStorage.getItem("infinai_chat_user_name");
             const email =
-              convo?.email ||
-              user?.email ||
+              convo?.user?.email ||
               localStorage.getItem("infinai_chat_user_email");
 
             if (!name || !email) {
@@ -538,7 +539,10 @@ const Chat = ({ setOpen, fullScreen, setFullScreen, standalone }) => {
 const Avatar = ({ onClick, src }) => {
   const { endpoints } = useContext(ChatContext);
   return (
-    <div className={`${s.avatar} ${src ? s.custom : ""}`} onClick={onClick}>
+    <div
+      className={`infinai_chat_avatar ${s.avatar} ${src ? s.custom : ""}`}
+      onClick={onClick}
+    >
       {src ? (
         <img src={endpoints.baseUrl + src} />
       ) : (
@@ -571,7 +575,7 @@ const Avatar = ({ onClick, src }) => {
 };
 
 const Message = ({ msg, castVote, loading, style }) => {
-  const { chatbotConfig, user, endpoints } = useContext(ChatContext);
+  const { chatbotConfig, convo, endpoints } = useContext(ChatContext);
 
   return (
     <div className={`${s.msg} ${s[msg.role]}`} style={style}>
@@ -620,7 +624,9 @@ const Message = ({ msg, castVote, loading, style }) => {
       </div>
       {msg.role === "user" && (
         <div className={s.msgAvatar}>
-          <div className={s.img}>{user?.name?.[0]?.toUpperCase() || "U"}</div>
+          <div className={s.img}>
+            {convo?.user?.name?.[0]?.toUpperCase() || "U"}
+          </div>
           <Moment format="hh:mm">{msg.createdAt}</Moment>
         </div>
       )}

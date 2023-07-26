@@ -125,6 +125,8 @@
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
+          font-size: 0.8em;
+          font-style: italic;
         }
       }
       .right {
@@ -432,7 +434,7 @@
       }
     }
     .chat {
-      width: 90vw;
+      width: 100%;
       height: 100%;
       max-height: calc(100vh) !important;
     }
@@ -558,6 +560,7 @@ button {
       grid-column: 1 / 2;
     }
     &.standalone {
+      z-index: inherit;
       .chat {
         width: 100%;
       }
@@ -574,5 +577,17 @@ button {
         }
       }
     }
+  }
+}
+
+.ellepsis {
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 1;
+  &.line-2 {
+    -webkit-line-clamp: 2;
   }
 }

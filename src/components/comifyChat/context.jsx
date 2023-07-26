@@ -5,7 +5,6 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { useLocation } from "react-router-dom";
 import useFetch from "./utils/useFetch.js";
 
 export const ChatContext = createContext();
@@ -32,7 +31,7 @@ export const generateMessages = ({
     messages.unshift({
       _id: "topicQuery",
       type: "suggestion",
-      options: topics,
+      options: topics.map((item) => item.topic),
       createdAt: chatStartedAt,
     });
   }
@@ -81,7 +80,9 @@ export const generateMessages = ({
     messages.unshift({
       _id: "queryQuery",
       role: "system",
-      content: "Please ask your question",
+      content:
+        topics?.find((t) => t.topic === topic)?.contextForUsers ||
+        "Please ask your question",
       createdAt: chatStartedAt,
     });
   }
@@ -117,23 +118,24 @@ export const ChatContextProvider = ({
   endpoints,
   containerId,
   blacklistedPaths,
-  whitelistedPaths,
+  paths,
+  standalone: defaultStand,
 }) => {
   const msgChannel = useRef();
   const [chatbotConfig, setChatbotConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
-  const [user, setUser] = useState(null);
   const [convo, setConvo] = useState(null);
   const [topics, setTopics] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [show, setShow] = useState(false);
+  const [standalone, setStandalone] = useState(
+    typeof defaultStand === "boolean" ? defaultStand : false
+  );
   const [initMessages, setInitMessages] = useState(
     generateMessages({ topics: [] })
   );
   const [botStatus, setBotStatus] = useState("active");
 
-  const { get: getTopics } = useFetch(endpoints.topics, {
-    "x-chatbot-id": chatbot_id,
-  });
   const { get: getChat } = useFetch(endpoints.chat, {
     "x-chatbot-id": chatbot_id,
   });
@@ -179,27 +181,18 @@ export const ChatContextProvider = ({
     getConfig({ params: { ":chatbot_id": chatbot_id } })
       .then(async ({ data }) => {
         if (data.success) {
-          setChatbotConfig(data.data);
-          if (data.data.primaryColor) {
-            const rgb = hexToRgba(data.data.primaryColor);
+          const { topics, ...rest } = data.data;
+          setChatbotConfig(rest);
+          setTopics(topics);
+          if (rest.primaryColor) {
+            const rgb = hexToRgba(rest.primaryColor);
             if (rgb.length >= 3) {
               document
                 .querySelector(":root")
                 .style.setProperty("--primary-color", rgb.join(", "));
             }
           }
-          let topics = await getTopics().then(({ data }) => {
-            if (data.success) {
-              setTopics(data.data);
-              return data.data;
-            } else {
-              return null;
-            }
-          });
-          return {
-            topics,
-            config: data.data,
-          };
+          return { topics, config: rest };
         }
       })
       .then(({ config, topics }) => {
@@ -226,17 +219,20 @@ export const ChatContextProvider = ({
                 );
               } else {
                 setConvo({
-                  name: localStorage.getItem("infinai_chat_user_name"),
-                  email: localStorage.getItem("infinai_chat_user_email"),
+                  user: {
+                    name: localStorage.getItem("infinai_chat_user_name"),
+                    email: localStorage.getItem("infinai_chat_user_email"),
+                  },
                 });
               }
             })
             .catch((err) => console.log(err));
         } else {
           setConvo({
-            topics,
-            name: localStorage.getItem("infinai_chat_user_name"),
-            email: localStorage.getItem("infinai_chat_user_email"),
+            user: {
+              name: localStorage.getItem("infinai_chat_user_name"),
+              email: localStorage.getItem("infinai_chat_user_email"),
+            },
           });
           setInitMessages(generateMessages({ topics }));
         }
@@ -247,12 +243,6 @@ export const ChatContextProvider = ({
           unmountChat();
         }
       });
-
-    const name = localStorage.getItem("infinai_chat_user_name");
-    const email = localStorage.getItem("infinai_chat_user_email");
-    if (name && email) {
-      setUser({ name, email });
-    }
 
     msgChannel.current = new BroadcastChannel(
       `infinai-chat-message-${chatbot_id}`
@@ -267,13 +257,43 @@ export const ChatContextProvider = ({
     };
   }, []);
 
-  const location = useLocation();
+  useEffect(() => {
+    const updateStatus = (pathname) => {
+      setShow(
+        (paths
+          ? paths.some((path) => pathname.match(new RegExp(`${path}$`)))
+          : true) &&
+          (blacklistedPaths ? !blacklistedPaths.includes(pathname) : true)
+      );
+      if (Array.isArray(defaultStand) && defaultStand.length) {
+        if (defaultStand.includes(pathname)) {
+          setStandalone(true);
+        } else {
+          setStandalone(false);
+        }
+      }
+    };
+
+    updateStatus(window.location.pathname);
+
+    let oldPathname = window.location.pathname;
+    const body = document.querySelector("body");
+    const observer = new MutationObserver((mutations) => {
+      const newPathname = window.location.pathname;
+      if (oldPathname !== newPathname) {
+        oldPathname = newPathname;
+        updateStatus(newPathname);
+      }
+    });
+    observer.observe(body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <ChatContext.Provider
       value={{
-        user,
-        setUser,
         topics,
         setTopics,
         convo,
@@ -289,18 +309,11 @@ export const ChatContextProvider = ({
         setInitMessages,
         chatbotConfig,
         setChatbotConfig,
+        chatbot_id,
+        standalone,
       }}
     >
-      {(whitelistedPaths
-        ? whitelistedPaths.includes(location.pathname)
-        : true) &&
-      (blacklistedPaths
-        ? !blacklistedPaths.includes(location.pathname)
-        : true) &&
-      chatbotConfig &&
-      botStatus === "active"
-        ? children
-        : null}
+      {chatbotConfig && botStatus === "active" && show ? children : null}
     </ChatContext.Provider>
   );
 };
