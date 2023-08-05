@@ -37,12 +37,6 @@ function App() {
         <Link to="/chatbot">Chatbot</Link>
       </div>
       <div id="chatContainer" />
-      <ChatContextProvider
-        chatbot_id={"64ad0fab0efb0096d63baf15"}
-        endpoints={getEndpoints()}
-      >
-        <ComifyChat openAtStart={false} standalone={false} />
-      </ChatContextProvider>
     </>
   );
 }

@@ -31,7 +31,7 @@ export const generateMessages = ({
     messages.unshift({
       _id: "topicQuery",
       type: "suggestion",
-      options: topics.map((item) => item.topic).map((item) => item.topic),
+      options: topics.map((item) => item.topic),
       createdAt: chatStartedAt,
     });
   }
@@ -311,7 +311,6 @@ export const ChatContextProvider = ({
         setChatbotConfig,
         chatbot_id,
         standalone,
-        chatbot_id,
       }}
     >
       {chatbotConfig && botStatus === "active" && show ? children : null}
