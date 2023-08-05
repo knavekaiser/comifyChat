@@ -79,7 +79,7 @@ export default function InfinAIChat({
 
 export function ChatContainer({ openAtStart }) {
   const [fullScreen, setFullScreen] = useState(false);
-  const { chatbotConfig, toasts, standalone } = useContext(ChatContext);
+  const { chatbotConfig, toasts } = useContext(ChatContext);
   const [open, setOpen] = useState(openAtStart || false);
 
   useEffect(() => {
