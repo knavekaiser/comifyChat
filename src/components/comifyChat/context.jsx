@@ -122,6 +122,7 @@ export const ChatContextProvider = ({
   standalone: defaultStand,
 }) => {
   const msgChannel = useRef();
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [chatbotConfig, setChatbotConfig] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [convo, setConvo] = useState(null);
@@ -258,31 +259,13 @@ export const ChatContextProvider = ({
   }, []);
 
   useEffect(() => {
-    const updateStatus = (pathname) => {
-      setShow(
-        (paths
-          ? paths.some((path) => pathname.match(new RegExp(`${path}$`)))
-          : true) &&
-          (blacklistedPaths ? !blacklistedPaths.includes(pathname) : true)
-      );
-      if (Array.isArray(defaultStand) && defaultStand.length) {
-        if (defaultStand.includes(pathname)) {
-          setStandalone(true);
-        } else {
-          setStandalone(false);
-        }
-      }
-    };
-
-    updateStatus(window.location.pathname);
-
     let oldPathname = window.location.pathname;
     const body = document.querySelector("body");
     const observer = new MutationObserver((mutations) => {
       const newPathname = window.location.pathname;
       if (oldPathname !== newPathname) {
         oldPathname = newPathname;
-        updateStatus(newPathname);
+        setCurrentPath(newPathname);
       }
     });
     observer.observe(body, { childList: true, subtree: true });
@@ -290,6 +273,22 @@ export const ChatContextProvider = ({
       observer.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    setShow(
+      (paths
+        ? paths.some((path) => currentPath.match(new RegExp(`${path}$`)))
+        : true) &&
+        (blacklistedPaths ? !blacklistedPaths.includes(currentPath) : true)
+    );
+    if (Array.isArray(defaultStand) && defaultStand.length) {
+      if (defaultStand.includes(currentPath)) {
+        setStandalone(true);
+      } else {
+        setStandalone(false);
+      }
+    }
+  }, [currentPath]);
 
   return (
     <ChatContext.Provider
@@ -311,6 +310,8 @@ export const ChatContextProvider = ({
         setChatbotConfig,
         chatbot_id,
         standalone,
+        currentPath,
+        setCurrentPath,
       }}
     >
       {chatbotConfig && botStatus === "active" && show ? children : null}

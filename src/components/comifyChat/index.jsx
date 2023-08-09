@@ -92,6 +92,34 @@ export function ChatContainer({ openAtStart }) {
     };
   }, []);
 
+  useEffect(() => {
+    !(function (f, b, e, v, n, t, s) {
+      if (f.fbq) return;
+      n = f.fbq = function () {
+        n.callMethod
+          ? n.callMethod.apply(n, arguments)
+          : n.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = n;
+      n.push = n;
+      n.loaded = !0;
+      n.version = "2.0";
+      n.queue = [];
+      t = b.createElement(e);
+      t.async = !0;
+      t.src = v;
+      s = b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t, s);
+    })(
+      window,
+      document,
+      "script",
+      "https://connect.facebook.net/en_US/fbevents.js"
+    );
+    fbq("init", "648770637226233");
+    fbq("track", "PageView");
+  }, []);
+
   return (
     <div
       className={`infinai_chat_container ${s.chatContainer} ${
@@ -120,6 +148,14 @@ export function ChatContainer({ openAtStart }) {
       ) : (
         <Avatar onClick={() => setOpen(true)} src={chatbotConfig?.avatar} />
       )}
+      <noscript>
+        <img
+          height="1"
+          width="1"
+          style="display:none"
+          src="https://www.facebook.com/tr?id=648770637226233&ev=PageView&noscript=1"
+        />
+      </noscript>
     </div>
   );
 }
@@ -393,76 +429,93 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                   }}
                 />
               )}
-              {item.type === "suggestion" && (
-                <Suggestions
-                  options={[...item.options]}
-                  active={convo?.topic}
-                  onChange={async (input) => {
-                    await wait(200);
+              {item.type === "suggestion" &&
+                (item._id === "topicQuery" ? (
+                  <Topics
+                    options={[...item.options]}
+                    active={convo?.topic}
+                    onChange={async (input) => {
+                      await wait(200);
 
-                    const name = convo?.user?.name;
-                    const email = convo?.user?.email;
+                      const name = convo?.user?.name;
+                      const email = convo?.user?.email;
 
-                    setConvo((prev) => ({
-                      topic: input,
-                      user: prev?.user,
-                    }));
+                      setConvo((prev) => ({
+                        topic: input,
+                        user: prev?.user,
+                      }));
 
-                    if (!name || !email) {
-                      setCurrInput("userDetail");
-                      return setInitMessages(
-                        generateMessages({
-                          topics,
-                          topic: input,
-                          askUserDetail: true,
-                        })
-                      );
-                    }
-
-                    setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
-
-                    if (!convo?._id) {
                       if (!name || !email) {
                         setCurrInput("userDetail");
-                        return;
+                        return setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            askUserDetail: true,
+                          })
+                        );
                       }
-                      setInitMessages(
-                        generateMessages({
-                          topics,
-                          topic: input,
-                          ...(name ? { name } : { askName: true }),
-                          ...(email ? { email } : { askEmail: !!name }),
-                          ...(name && email ? { askQuery: true } : {}),
-                        })
-                      );
-                    } else {
-                      setInitMessages(
-                        generateMessages({
-                          topics,
-                          topic: input,
-                          input,
-                          name,
-                          email,
-                          askQuery: true,
-                        })
-                      );
-                      setCurrInput("query");
 
-                      setMessages([]);
-                      localStorage.removeItem("infinai_chat_id");
-                      messagesRef.current.scrollTop = 0;
-                    }
-                  }}
-                  style={{
-                    marginBottom:
-                      arr[i - 1]?.type === "suggestion"
-                        ? 5
-                        : arr[i - 1] && arr[i - 1]?.role !== item.role
-                        ? 25
-                        : 0,
-                  }}
-                />
-              )}
+                      setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
+
+                      if (!convo?._id) {
+                        if (!name || !email) {
+                          setCurrInput("userDetail");
+                          return;
+                        }
+                        setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            ...(name ? { name } : { askName: true }),
+                            ...(email ? { email } : { askEmail: !!name }),
+                            ...(name && email ? { askQuery: true } : {}),
+                          })
+                        );
+                      } else {
+                        setInitMessages(
+                          generateMessages({
+                            topics,
+                            topic: input,
+                            input,
+                            name,
+                            email,
+                            askQuery: true,
+                          })
+                        );
+                        setCurrInput("query");
+
+                        setMessages([]);
+                        localStorage.removeItem("infinai_chat_id");
+                        messagesRef.current.scrollTop = 0;
+                      }
+                    }}
+                    style={{
+                      marginBottom:
+                        arr[i - 1]?.type === "suggestion"
+                          ? 5
+                          : arr[i - 1] && arr[i - 1]?.role !== item.role
+                          ? 25
+                          : 0,
+                    }}
+                  />
+                ) : (
+                  <Suggestions
+                    options={[...item.options]}
+                    active={convo?.topic}
+                    onChange={async (input) => {
+                      // do something
+                    }}
+                    style={{
+                      marginBottom:
+                        arr[i - 1]?.type === "suggestion"
+                          ? 5
+                          : arr[i - 1] && arr[i - 1]?.role !== item.role
+                          ? 25
+                          : 0,
+                    }}
+                  />
+                ))}
               {!("type" in item) && (
                 <Message
                   msg={item}
@@ -690,6 +743,34 @@ const MessageForm = ({ msg, style, onSubmit }) => {
           <button type="submit">Submit</button>
         </form>
       </div>
+    </div>
+  );
+};
+
+const Topics = ({ options, active, onChange, style }) => {
+  const { currentPath, topics } = useContext(ChatContext);
+  return (
+    <div className={s.suggestions} style={{ ...style }}>
+      {options
+        .filter((item) => {
+          const topic = topics.find((t) => t.topic === item);
+          return (
+            !topic.paths?.length ||
+            topic.paths.some((path) =>
+              currentPath.match(new RegExp(`${path}$`))
+            )
+          );
+        })
+        .map((item) => (
+          <button
+            disabled={item === active}
+            className={`${s.chip} ${item === active ? s.active : ""}`}
+            key={item}
+            onClick={() => onChange(item)}
+          >
+            {item}
+          </button>
+        ))}
     </div>
   );
 };

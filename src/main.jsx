@@ -55,7 +55,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <ChatContextProvider
         chatbot_id={"64ad0fab0efb0096d63baf15"}
         endpoints={getEndpoints()}
-        paths={["/", "/chatbot"]}
+        paths={["/", "/chatbot", "/about-us"]}
         standalone={["/chatbot"]}
         containerId="chatContainer"
       >
