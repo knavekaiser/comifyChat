@@ -15,6 +15,9 @@ export const generateMessages = ({
   topic,
   askUserDetail,
   askQuery,
+  subTopics,
+  subTopic,
+  askSubQuery,
   queryResponse,
 }) => {
   const messages = [
@@ -77,6 +80,8 @@ export const generateMessages = ({
     });
   }
   if (askQuery) {
+    // const subTopics = topics?.find((i) => i.topic === topic)?.subTopics || [];
+
     messages.unshift({
       _id: "queryQuery",
       role: "system",
@@ -85,6 +90,34 @@ export const generateMessages = ({
         "Please ask your question",
       createdAt: chatStartedAt,
     });
+
+    if (subTopics?.length) {
+      messages.unshift({
+        role: "system",
+        _id: "subTopicQuery",
+        type: "suggestion",
+        options: subTopics.map((item) => item.topic),
+        createdAt: chatStartedAt,
+      });
+      if (subTopic) {
+        messages.unshift({
+          _id: "subTopicResponse",
+          role: "user",
+          content: subTopic,
+          createdAt: chatStartedAt,
+        });
+      }
+      if (askSubQuery) {
+        messages.unshift({
+          _id: "subQueryQuery",
+          role: "system",
+          content:
+            subTopics?.find((t) => t.topic === subTopic)?.contextForUsers ||
+            "Please ask your question",
+          createdAt: chatStartedAt,
+        });
+      }
+    }
   }
   return messages;
 };
@@ -208,13 +241,22 @@ export const ChatContextProvider = ({
               if (data.success) {
                 setConvo({ ...data.data, topics, messages: undefined });
                 setMessages(data.data.messages.reverse());
+                const topic = topics.find((t) => t.topic === data.data.topic);
+                const subTopic = topic?.subTopics?.find(
+                  (t) => t.topic === data.data.subTopic
+                );
                 setInitMessages(
                   generateMessages({
                     chatStartedAt: new Date(data.data.createdAt),
                     topics,
-                    ...(topics.includes(data.data.topic) && {
-                      topic: data.data.topic,
+                    ...(topic && {
+                      topic: topic.topic,
                       askQuery: true,
+                      ...(subTopic && {
+                        subTopics: topic.subTopics,
+                        subTopic: subTopic.topic,
+                        askSubQuery: true,
+                      }),
                     }),
                   })
                 );

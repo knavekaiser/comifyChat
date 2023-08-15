@@ -227,7 +227,8 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
         email: convo?.user?.email,
         ...userDetail,
         message: msg,
-        topic: convo.topic,
+        topic: convo.subTopic || convo.topic,
+        parentTopic: convo.subTopic ? convo.topic : undefined,
       };
       sendMessage(payload, { params: { ":chat_id": "" } })
         .then(({ data }) => {
@@ -238,12 +239,25 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
           localStorage.setItem("infinai_chat_user_name", data.data.user.name);
           localStorage.setItem("infinai_chat_user_email", data.data.user.email);
           if (reloadInit) {
+            const topic = topics.find((t) => t.topic === data.data.topic);
+            const subTopic = topic?.subTopics?.find(
+              (t) => t.topic === data.data.subTopic
+            );
             setInitMessages(
               generateMessages({
                 topics,
-                ...(topics.some((t) => t.topic === data.data.topic) && {
-                  topic: data.data.topic,
+                // ...(topics.some((t) => t.topic === data.data.topic) && {
+                //   topic: data.data.topic,
+                //   askQuery: true,
+                // }),
+                ...(topic && {
+                  topic: topic.topic,
                   askQuery: true,
+                  ...(subTopic && {
+                    subTopics: topic.subTopics,
+                    subTopic: subTopic.topic,
+                    askSubQuery: true,
+                  }),
                 }),
               })
             );
@@ -429,36 +443,40 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                   }}
                 />
               )}
-              {item.type === "suggestion" &&
-                (item._id === "topicQuery" ? (
-                  <Topics
-                    options={[...item.options]}
-                    active={convo?.topic}
-                    onChange={async (input) => {
-                      await wait(200);
+              {item.type === "suggestion" && (
+                <>
+                  {item._id === "topicQuery" && (
+                    <Topics
+                      options={[...item.options]}
+                      active={convo?.topic}
+                      onChange={async (input) => {
+                        await wait(200);
 
-                      const name = convo?.user?.name;
-                      const email = convo?.user?.email;
+                        const name = convo?.user?.name;
+                        const email = convo?.user?.email;
 
-                      setConvo((prev) => ({
-                        topic: input,
-                        user: prev?.user,
-                      }));
+                        setConvo((prev) => ({
+                          topic: input,
+                          user: prev?.user,
+                        }));
 
-                      if (!name || !email) {
-                        setCurrInput("userDetail");
-                        return setInitMessages(
-                          generateMessages({
-                            topics,
-                            topic: input,
-                            askUserDetail: true,
-                          })
+                        if (!name || !email) {
+                          setCurrInput("userDetail");
+                          return setInitMessages(
+                            generateMessages({
+                              topics,
+                              topic: input,
+                              askUserDetail: true,
+                            })
+                          );
+                        }
+
+                        setTimeout(
+                          () => (messagesRef.current.scrollTop = 0),
+                          20
                         );
-                      }
 
-                      setTimeout(() => (messagesRef.current.scrollTop = 0), 20);
-
-                      if (!convo?._id) {
+                        // if (!convo?._id) {
                         if (!name || !email) {
                           setCurrInput("userDetail");
                           return;
@@ -467,55 +485,118 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                           generateMessages({
                             topics,
                             topic: input,
+                            subTopics: topics.find((t) => t.topic === input)
+                              ?.subTopics,
                             ...(name ? { name } : { askName: true }),
                             ...(email ? { email } : { askEmail: !!name }),
                             ...(name && email ? { askQuery: true } : {}),
                           })
                         );
-                      } else {
+                        // } else {
+                        //   setInitMessages(
+                        //     generateMessages({
+                        //       topics,
+                        //       topic: input,
+                        //       name,
+                        //       email,
+                        //       askQuery: true,
+                        //     })
+                        //   );
+                        //   setCurrInput("query");
+
+                        //   setMessages([]);
+                        //   localStorage.removeItem("infinai_chat_id");
+                        //   messagesRef.current.scrollTop = 0;
+                        // }
+                      }}
+                      style={{
+                        marginBottom:
+                          arr[i - 1]?.type === "suggestion"
+                            ? 5
+                            : arr[i - 1] && arr[i - 1]?.role !== item.role
+                            ? 25
+                            : 0,
+                      }}
+                    />
+                  )}
+                  {item._id === "subTopicQuery" && (
+                    <Topics
+                      options={[...item.options]}
+                      active={convo?.subTopic}
+                      onChange={async (input) => {
+                        await wait(200);
+
+                        setConvo((prev) => ({
+                          ...prev,
+                          subTopic: input,
+                        }));
+
+                        setTimeout(
+                          () => (messagesRef.current.scrollTop = 0),
+                          20
+                        );
+
+                        const topic = topics.find(
+                          (t) => t.topic === convo.topic
+                        );
+
+                        // if (!convo?._id) {
                         setInitMessages(
                           generateMessages({
                             topics,
-                            topic: input,
-                            input,
-                            name,
-                            email,
+                            topic: topic.topic,
+                            subTopics: topic.subTopics,
+                            subTopic: input,
                             askQuery: true,
+                            askSubQuery: true,
                           })
                         );
-                        setCurrInput("query");
+                        // } else {
+                        //   setInitMessages(
+                        //     generateMessages({
+                        //       topics,
+                        //       topic: convo.topic,
+                        //       subTopic: input,
+                        //       askQuery: true,
+                        //     })
+                        //   );
+                        //   setCurrInput("query");
 
-                        setMessages([]);
-                        localStorage.removeItem("infinai_chat_id");
-                        messagesRef.current.scrollTop = 0;
-                      }
-                    }}
-                    style={{
-                      marginBottom:
-                        arr[i - 1]?.type === "suggestion"
-                          ? 5
-                          : arr[i - 1] && arr[i - 1]?.role !== item.role
-                          ? 25
-                          : 0,
-                    }}
-                  />
-                ) : (
-                  <Suggestions
-                    options={[...item.options]}
-                    active={convo?.topic}
-                    onChange={async (input) => {
-                      // do something
-                    }}
-                    style={{
-                      marginBottom:
-                        arr[i - 1]?.type === "suggestion"
-                          ? 5
-                          : arr[i - 1] && arr[i - 1]?.role !== item.role
-                          ? 25
-                          : 0,
-                    }}
-                  />
-                ))}
+                        //   setMessages([]);
+                        //   localStorage.removeItem("infinai_chat_id");
+                        //   messagesRef.current.scrollTop = 0;
+                        // }
+                      }}
+                      style={{
+                        marginBottom:
+                          arr[i - 1]?.type === "suggestion"
+                            ? 5
+                            : arr[i - 1] && arr[i - 1]?.role !== item.role
+                            ? 25
+                            : 0,
+                      }}
+                    />
+                  )}
+                  {!["topicQuery", "subTopicQuery"].includes(item._id) && (
+                    <Suggestions
+                      options={[...item.options]}
+                      active={convo?.topic}
+                      onChange={async (input) => {
+                        // do something
+                      }}
+                      style={{
+                        // marginLeft: item.role ? "unset" : "55px",
+                        marginBottom:
+                          arr[i - 1]?.type === "suggestion"
+                            ? 5
+                            : arr[i - 1] && arr[i - 1]?.role !== item.role
+                            ? 25
+                            : 0,
+                      }}
+                    />
+                  )}
+                </>
+              )}
               {!("type" in item) && (
                 <Message
                   msg={item}
@@ -527,6 +608,9 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
                         : arr[i - 1] && arr[i - 1]?.role !== item.role
                         ? 25
                         : 0,
+                    // ...(arr[i - 1]?.type === "suggestion" && {
+                    //   marginBottom: "-.5rem",
+                    // }),
                   }}
                   castVote={vote}
                 />
@@ -562,7 +646,7 @@ const Chat = ({ setOpen, fullScreen, setFullScreen }) => {
               setCurrInput("userDetail");
               return;
             }
-            initChat(values.msg, { name, email });
+            initChat(values.msg, { name, email }, { reloadInit: true });
             setCurrInput("query");
           }}
           scrollDown={() => {
@@ -755,8 +839,8 @@ const Topics = ({ options, active, onChange, style }) => {
         .filter((item) => {
           const topic = topics.find((t) => t.topic === item);
           return (
-            !topic.paths?.length ||
-            topic.paths.some((path) =>
+            !topic?.paths?.length ||
+            topic?.paths?.some((path) =>
               currentPath.match(new RegExp(`${path}$`))
             )
           );
